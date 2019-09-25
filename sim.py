@@ -179,6 +179,16 @@ def rz_gate(phi=np.pi):
 
 
 def main():
+    circ = Circuit("00")
+
+    circ.add_gate(circ.h(0))
+    circ.run()
+    circ.measure(1)
+    circ.print()
+
+
+
+    return
     circ = Circuit("0000")
 
     phi = 0.01 * np.pi
