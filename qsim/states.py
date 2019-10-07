@@ -14,3 +14,5 @@ PLUS = np.array([[1, 1]]).T / np.sqrt(2)
 MINUS = np.array([[1, -1]]).T / np.sqrt(2)
 P0 = np.dot(ZERO, ZERO.T)
 P1 = np.dot(ONE, ONE.T)
+
+STATES = {"0": ZERO, "1": ONE, "+": PLUS, "-": MINUS}

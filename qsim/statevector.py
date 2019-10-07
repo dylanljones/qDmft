@@ -81,6 +81,11 @@ class Statevector:
         self.n_qubits = int(np.log2(self.n))
         self.basis = basis_states(self.n)
 
+    @classmethod
+    def new(cls, vector):
+        s = np.asarray(vector)
+        return cls(s / la.norm(s))
+
     def __str__(self):
         line = "-------"
         strings = [line]
@@ -101,6 +106,9 @@ class Statevector:
 
     def tensor(self, size=2):
         return self.amp.reshape([size] * self.n_qubits)
+
+    def from_tensor(self, tensor):
+        self.amp = tensor.reshape((self.n, 1))
 
     @property
     def norm(self):
