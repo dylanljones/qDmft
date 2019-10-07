@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Created on 20 Sep 2019
-author: Dylan Jones
+Created on 10 Nov 2018
+@author: Dylan Jones
 
-project: Qsim
+project: __init__.py$
 version: 1.0
 """
-from .state import *
-from .objects import *
+from .states import *
 from .utils import kron
+from .statevector import *

@@ -139,7 +139,7 @@ class Register:
     def qubit_indices(self, index):
         idx0, idx1 = list(), list()
         for i in range(self.n_states):
-            if self.basis[i].get_bit(self.n - index - 1) == 0:
+            if self.basis[i].get_bit(index) == 0:
                 idx0.append(i)
             else:
                 idx1.append(i)

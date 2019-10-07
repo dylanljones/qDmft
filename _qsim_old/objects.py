@@ -7,7 +7,15 @@ project: Qsim
 version: 1.0
 """
 import numpy as np
-from qsim import State, kron
+from _qsim_old import State, kron
+
+ZERO = np.array([[1, 0]]).T
+ONE = np.array([[0, 1]]).T
+
+P0 = np.dot(ZERO, ZERO.T)
+P1 = np.dot(ONE, ONE.T)
+
+# ======================== SINGLE QUBIT GATES =======================
 
 X_GATE = np.array([[0, 1], [1, 0]])
 Y_GATE = np.array([[0, -1j], [1j, 0]])
@@ -15,6 +23,36 @@ Z_GATE = np.array([[1, 0], [0, -1]])
 HADAMARD_GATE = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
 PHASE_GATE = np.array([[1, 0], [0, 1j]])
 T_GATE = np.array([[1, 0], [0, np.exp(1j*np.pi/4)]])
+
+# ---------------- ROTATION GATES -----------------------------------
+
+
+def rx_gate(phi=0):
+    arg = phi / 2
+    return np.array([[np.cos(arg), -1j*np.sin(arg)],
+                     [-1j*np.sin(arg), np.cos(arg)]])
+
+
+def ry_gate(phi=0):
+    arg = phi / 2
+    return np.array([[np.cos(arg), -np.sin(arg)],
+                     [+np.sin(arg), np.cos(arg)]])
+
+
+def rz_gate(phi=0):
+    arg = 1j * phi / 2
+    return np.array([[np.exp(-arg), 0], [0, np.exp(arg)]])
+
+
+# ======================== TWO QUBIT GATES ===========================
+
+CNOT = np.array([[1, 0, 0, 0],
+                 [0, 1, 0, 0],
+                 [0, 0, 0, 1],
+                 [0, 0, 1, 0]])
+
+
+# -------------------------------------------------------------------
 
 
 class CircuitObject:
@@ -62,3 +100,17 @@ class Gate(CircuitObject):
 
     def apply(self, verbose=True, *args, **kwargs):
         self.reg.apply_gate(self.array)
+
+
+class Measurement(CircuitObject):
+
+    def __init__(self, register, qubit, out, target=None, decimals=5):
+        if target is None:
+            target = qubit
+        super().__init__(register, qubit, "Measure", out)
+        self.decimals = decimals
+        self.idx = target
+
+    def apply(self, simulate=True):
+        res, p = self.reg.measure_qubit(self.qubit, simulate=simulate, decimals=self.decimals)
+        self.out[self.idx] = res

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on 25 Sep 2019
-author: Dylan Jones
+Created on 10 Nov 2018
+@author: Dylan Jones
 
-project: qDmft
+project: __init__.py$
 version: 1.0
 """
 

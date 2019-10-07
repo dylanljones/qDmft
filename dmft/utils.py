@@ -10,13 +10,11 @@ import numpy as np
 import scipy.linalg as la
 from itertools import product
 
-paulix = np.array([[0, 1], [1, 0]])
-paulix = np.array([[0, -1j], [1j, 0]])
-paulix = np.array([[1, 0], [0, -1]])
 
 # =========================================================================
 #                               GENERAL
 # =========================================================================
+
 
 def get_eta(omegas, n):
     dw = abs(omegas[1] - omegas[0])
@@ -28,20 +26,8 @@ def get_omegas(omax=5, n=1000, deta=0.5):
     return omegas, get_eta(omegas, deta)
 
 
-def ensure_array(x):
-    return x if hasattr(x, "__len__") else [x]
-
-
 def spectral(gf):
     return -1/np.pi * gf.imag
-
-
-def uniform(w, size):
-    return np.random.uniform(-w/2, w/2, size=size)
-
-
-def uniform_eye(w, size):
-    return np.eye(size) * np.random.uniform(-w / 2, w / 2, size=size)
 
 
 def diagonalize(operator):
@@ -50,8 +36,17 @@ def diagonalize(operator):
     # eig_values -= np.amin(eig_values)
     return eig_values, eig_vecs
 
+
+def decompose(operator):
+    eigvals, eigstates = la.eigh(operator)
+    eigstates_adj = np.conj(eigstates).T
+    # eigvals -= np.amin(eigvals)
+    return eigstates_adj, eigvals, eigstates
+
+
 def iter_indices(n):
     return product(range(n), range(n))
+
 
 # =========================================================================
 #                               FERMIONS

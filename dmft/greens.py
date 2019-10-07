@@ -8,13 +8,12 @@ version: 1.0
 """
 import numpy as np
 from itertools import product
+from .utils import decompose
 from scipy import linalg as la
-
-# =========================================================================
 
 
 def greens_function_free(ham, z):
-    """ Calculate the greens function of the given Hamiltonian
+    """ Calculates the non-interacting Green's function in the Lehmann representation
 
     Parameters
     ----------
@@ -27,21 +26,18 @@ def greens_function_free(ham, z):
     -------
     greens: np.ndarray
     """
-    z = np.asarray(z)
-
     # Calculate eigenvalues and -vectors of hamiltonian
-    eigvals, eigstates = np.linalg.eig(ham)
-    eigstates_adj = np.conj(eigstates).T
-
-    # Calculate greens-function
-    subscript_str = "ij,...j,ji->...i"
+    # and prepare arguments
+    eigstates_adj, eigvals, eigstates = decompose(ham)
+    mat = eigstates_adj * eigstates
     arg = np.subtract.outer(z, eigvals)
-    greens = np.einsum(subscript_str, eigstates_adj, 1 / arg, eigstates)
-    return greens.T
 
-
-def self_energy(gf_imp0, gf_imp):
-    return 1/gf_imp0 - 1/gf_imp
+    # Calculate the diagonal elements of the greens-function
+    n = len(eigvals)
+    gf = np.zeros((n, len(z)), dtype="complex")
+    for i, j in product(range(n), range(n)):
+        gf[i] += mat[i, j] / arg[:, j]
+    return gf
 
 
 def greens_function(eigvals, eigstates, operator, z, beta=1.):
@@ -64,6 +60,10 @@ def greens_function(eigvals, eigstates, operator, z, beta=1.):
     for i, j in product(range(n), range(n)):
         gf += tmat[i, j] / (z - gap[i, j]) * weights[j, i]
     return gf / partition
+
+
+def self_energy(gf_imp0, gf_imp):
+    return 1/gf_imp0 - 1/gf_imp
 
 
 # =========================================================================

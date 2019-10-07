@@ -12,34 +12,97 @@ from scipy import integrate
 from scipy import optimize
 from scipy.sparse import csr_matrix
 from itertools import product
+from .greens import self_energy
+from .bethe import bethe_dos
+from .utils import diagonalize
 
 
-def bethe_dos(z, t):
-    """Density of states of the Bethe lattice"""
-    energy = np.asarray(z).clip(-2 * t, 2 * t)
-    return np.sqrt(4 * t**2 - energy**2) / (2 * np.pi * t**2)
+# Reference functions taken from M. Potthof:
+# 'Two-site dynamical mean-field theory'
 
 
-def bethe_gf_omega(z, t=1.0):
-    """Local Green's function of Bethe lattice for infinite Coordination number.
+def impurity_gf_free_ref(z, eps0, eps1, t):
+    e = (eps1 - eps0) / 2
+    r = np.sqrt(e*e + t*t)
+    term1 = (r - e) / (z - e - r)
+    term2 = (r + e) / (z - e + r)
+    return 1/(2*r) * (term1 + term2)
 
-    Taken from gf_tools by Weh Andreas
-    https://github.com/DerWeh/gftools/blob/master/gftools/__init__.py
+
+# Reference functions taken from E. Lange:
+# 'Renormalized vs. unrenormalized perturbation-theoretical
+# approaches to the Mott transition'
+
+def impurity_gf_ref(z, u, v):
+    sqrt16 = np.sqrt(u ** 2 + 16 * v ** 2)
+    sqrt64 = np.sqrt(u ** 2 + 64 * v ** 2)
+    a1 = 1/4 * (1 - (u ** 2 - 32 * v ** 2) / np.sqrt((u ** 2 + 64 * v ** 2) * (u ** 2 + 16 * v ** 2)))
+    a2 = 1/2 - a1
+    e1 = 1/4 * (sqrt64 - sqrt16)
+    e2 = 1/4 * (sqrt64 + sqrt16)
+    return (a1 / (z - e1) + a1 / (z + e1)) + (a2 / (z - e2) + a2 / (z + e2))
+
+
+# =========================================================================
+
+
+def m2_weight(t):
+    """ Calculates the second moment weight
 
     Parameters
     ----------
-    z : complex ndarray or complex
-        Green's function is evaluated at complex frequency `z`
-    t : float
-        Hopping parameter of the bethe lattice. This defines the bandwidth 'D=4t'
+    t: float
+        Hopping parameter of the lattice model
+
     Returns
     -------
-    bethe_gf_omega : complex ndarray or complex
-        Value of the Green's function
+    m2: float
     """
-    half_bandwidth = 2 * t
-    z_rel = z / half_bandwidth
-    return 2. / half_bandwidth * z_rel * (1 - np.sqrt(1 - 1 / (z_rel * z_rel)))
+    return integrate.quad(lambda x: x*x * bethe_dos(x, t), -2*t, 2*t)[0]
+
+
+def quasiparticle_weight(omegas, sigma):
+    """ Calculates the quasiparticle weight
+
+    Parameters
+    ----------
+    omegas: array_like
+        Array containig frequency values
+    sigma: array_like
+        Array containig self energy values
+    Returns
+    -------
+    z: float
+    """
+    dw = omegas[1] - omegas[0]
+    win = (-dw <= omegas) * (omegas <= dw)
+    dsigma = np.polyfit(omegas[win], sigma.real[win], 1)[0]
+    z = 1/(1 - dsigma)
+    if z < 0.01:
+        z = 0
+    return z
+
+
+def filling(omegas, gf):
+    """ Calculate the filling using the Green's function of the corresponding model
+
+    Parameters
+    ----------
+    omegas: array_like
+        Array containig frequency values
+    gf: array_like
+        Array containig the Green's function values
+
+    Returns
+    -------
+    n: float
+    """
+    idx = np.argmin(np.abs(omegas)) + 1
+    x = omegas[:idx]
+    y = -gf[:idx].imag
+    x[-1] = 0
+    y[-1] = (y[-1] + y[-2]) / 2
+    return integrate.simps(y, x)
 
 
 # =========================================================================
@@ -52,7 +115,7 @@ def basis_states(sites):
 
     The states are initialized as integer. The binary represents the occupation of the lattice.
 
-    idx     ↓3 ↑3 ↓2 ↑2 ↓1 ↑1
+    idx     3↓ 3↑ 2↓ 2↑ 1↓ 1↑
     binary  0  1  0  1  1  0
 
     Parameters
@@ -121,89 +184,6 @@ def annihilation_operator(states, idx):
     return csr_matrix((data, (row, col)), shape=(n, n), dtype="int")
 
 
-# =========================================================================
-# Green's function and impurity model
-# =========================================================================
-
-def diagonalize(operator):
-    """ Diagonalizes the given operator"""
-    eig_values, eig_vecs = la.eigh(operator)
-    # eig_values -= np.amin(eig_values)
-    return eig_values, eig_vecs
-
-
-def greens_function(eigvals, eigstates, operator, z, beta=1.):
-    """ Calculate the interacting Green's function in Lehmann representation
-
-    Parameters
-    ----------
-    eigvals: array_like
-        Eigenvalues of the many-body system
-    eigstates: array_like
-        Eigenvectors of the many-body system
-    operator: array_like
-        Annihilation operator in matrix representation of a given site and spin
-    z: array_like
-        Energy values to evaluate the Green's function
-    beta: float
-        Inverse of the temperature
-
-    Returns
-    -------
-    gf: np.ndarray
-    """
-
-    # Create basis and braket matrix <n|c|m> of the given operator
-    basis = np.dot(eigstates.T, operator.dot(eigstates))
-    qmat = np.square(basis)
-
-    # Calculate the energy gap matrix
-    gap = np.add.outer(-eigvals, eigvals)
-
-    # Calculate weights and partition function
-    ew = np.exp(-beta*eigvals)
-    weights = np.add.outer(ew, ew)
-    partition = ew.sum()
-
-    # Construct Green's function
-    n = eigvals.size
-    gf = np.zeros_like(z)
-    for i, j in product(range(n), range(n)):
-        gf += qmat[i, j] / (z - gap[i, j]) * weights[i, j]
-    return gf / partition
-
-
-def self_energy(gf_imp0, gf_imp):
-    """ Calculate the self energy from the non-interacting and interacting Green's function"""
-    return 1/gf_imp0 - 1/gf_imp
-
-
-def m2_weight(t):
-    """ Calculates the second moment weight"""
-    return integrate.quad(lambda x: x*x * bethe_dos(x, t), -2*t, 2*t)[0]
-
-
-def quasiparticle_weight(omegas, sigma):
-    """ Calculates the quasiparticle weight"""
-    dw = omegas[1] - omegas[0]
-    win = (-dw <= omegas) * (omegas <= dw)
-    dsigma = np.polyfit(omegas[win], sigma.real[win], 1)[0]
-    z = 1/(1 - dsigma)
-    if z < 0.01:
-        z = 0
-    return z
-
-
-def filling(omegas, gf):
-    """ Calculate the filling using the Green's function of the corresponding model"""
-    idx = np.argmin(np.abs(omegas)) + 1
-    x = omegas[:idx]
-    y = -gf[:idx].imag
-    x[-1] = 0
-    y[-1] = (y[-1] + y[-2]) / 2
-    return integrate.simps(y, x)
-
-
 class HamiltonOperator:
 
     def __init__(self, operators):
@@ -239,108 +219,39 @@ class TwoSiteSiam:
         self.v = float(v)
 
     def param_str(self, dec=2):
-        u = f"u={self.u:.{dec}}"
-        eps_imp = f"eps_imp={self.eps_imp:.{dec}}"
-        eps_bath = f"eps_bath={self.eps_bath:.{dec}}"
-        v = f"v={self.v:.{dec}}"
-        return ", ".join([u, eps_imp, eps_bath, v])
+        parts = [f"u={self.u:.{dec}}", f"eps_imp={self.eps_imp:.{dec}}",
+                 f"eps_bath={self.eps_bath:.{dec}}", f"v={self.v:.{dec}}"]
+        return ", ".join(parts)
 
     def bathparam_str(self, dec=2):
-        eps_bath = f"eps_bath={self.eps_bath:.{dec}}"
-        v = f"v={self.v:.{dec}}"
-        return ", ".join([eps_bath, v])
+        parts = [f"eps_bath={self.eps_bath:.{dec}}", f"v={self.v:.{dec}}"]
+        return ", ".join(parts)
 
     def hybridization(self, z):
-        delta = self.v**2 / (z + self.mu - self.eps_bath)
+        delta = self.v ** 2 / (z + self.mu - self.eps_bath)
         return delta
 
     def hamiltonian(self):
         return self.ham_op.build(self.u, self.eps_imp, self.eps_bath, self.v)
-
-    def hamiltonian_free(self):
-        return np.array([[self.eps_imp, self.v], [self.v, self.eps_bath]])
 
     def diagonalize(self):
         ham_sparse = self.hamiltonian()
         self.eig = diagonalize(ham_sparse.todense())
 
     def impurity_gf(self, z, spin=0):
-        self.diagonalize()
-        eigvals, eigstates = self.eig
-        return greens_function(eigvals, eigstates, self.ops[spin].todense(), z + self.mu, self.beta)
+        # self.diagonalize()
+        # eigvals, eigstates = self.eig
+        # return greens_function(eigvals, eigstates, self.ops[spin].todense(), z + self.mu, self.beta)
+        return impurity_gf_ref(z, self.u, self.v)
 
     def impurity_gf_free(self, z):
-        return 1/(z + self.mu - self.eps_imp - self.hybridization(z))
+        # return 1/(z + self.mu - self.eps_imp - self.hybridization(z))
+        return impurity_gf_free_ref(z + self.mu, self.eps_imp, self.eps_bath, self.v)
+
+    def self_energy(self, z):
+        gf_imp0 = self.impurity_gf_free(z)
+        gf_imp = self.impurity_gf(z)
+        return self_energy(gf_imp0, gf_imp)
 
     def __str__(self):
         return f"Siam({self.param_str()})"
-
-
-class TwoSiteDmft:
-
-    def __init__(self, z, u=5, eps=0, t=1, mu=None, eps_bath=None, beta=10.):
-        self.mu = u / 2 if mu is None else mu
-        self.z = z
-        self.t = t
-        eps_bath = mu if eps_bath is None else eps_bath
-        self.siam = TwoSiteSiam(u, eps, eps_bath, t, mu, beta)
-        self.m2 =  t #m2_weight(t)
-
-        self.gf_imp0 = None
-        self.gf_imp = None
-        self.sigma = None
-        self.gf_latt = None
-        self.quasiparticle_weight = None
-
-    def solve(self, spin=0):
-        self.gf_imp0 = self.siam.impurity_gf_free(self.z)
-        self.gf_imp = self.siam.impurity_gf(self.z, spin=spin)
-        self.sigma = self_energy(self.gf_imp0, self.gf_imp)
-        self.gf_latt = bethe_gf_omega(self.z + self.mu - self.sigma, self.t)
-        self.quasiparticle_weight = quasiparticle_weight(self.z.real, self.sigma)
-
-    def impurity_filling(self):
-        return filling(self.z.real, self.gf_imp) / np.pi
-
-    def lattice_filling(self):
-        return filling(self.z.real, self.gf_latt) / np.pi
-
-    def filling_condition(self, eps_bath):
-        self.siam.update_bath_energy(eps_bath)
-        self.solve()
-        return self.impurity_filling() - self.lattice_filling()
-
-    def optimize_filling(self, tol=1e-2):
-        x = np.asarray([self.siam.eps_bath])
-        sol = optimize.root(self.filling_condition, x0=x, tol=tol)
-        if not sol.success:
-            raise ValueError(f"Failed to optimize filling! ({self.siam.param_str()})")
-        else:
-            self.siam.update_bath_energy(sol.x)
-            self.solve()
-            return self.impurity_filling() - self.lattice_filling()
-
-    def new_hybridization(self, mixing=1.0):
-        z = self.quasiparticle_weight
-        v_new = np.sqrt(z * self.m2)
-        new, old = mixing, 1.0 - mixing
-        return (v_new * new) + (self.siam.v * old)
-
-    def solve_self_consistent(self, spin=0, mixing=1.0, vtol=1e-4, ntol=1e-2, nmax=1000):
-        v = self.siam.v + 1e-10
-        it, delta_v, delta_n = 0, 0, 0
-        for it in range(nmax):
-            # self.optimize_filling(ntol)
-            self.siam.update_hybridization(v)
-            self.solve(spin)
-            if self.quasiparticle_weight == 0:
-                break
-            v_new = self.new_hybridization(mixing)
-            delta_v = abs(v - v_new)
-            v = v_new
-            if delta_v <= vtol:
-                break
-
-        self.siam.update_hybridization(v)
-        self.solve()
-        return it, delta_v, delta_n
