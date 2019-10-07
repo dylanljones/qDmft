@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on 19 Sep 2019
+Created on 26 Sep 2019
 author: Dylan Jones
 
-project: cmpy
-version: 1.0
+project: qDmft
+version: 0.1
 """
 import numpy as np
 import scipy.linalg as la

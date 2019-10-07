@@ -4,7 +4,7 @@ Created on 26 Sep 2019
 author: Dylan Jones
 
 project: qDmft
-version: 1.0
+version: 0.1
 """
 import numpy as np
 import scipy.linalg as la

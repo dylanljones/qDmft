@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on 10 Nov 2018
-@author: Dylan Jones
+Created on 26 Sep 2019
+author: Dylan Jones
 
-project: gates$
-version: 1.0
+project: qDmft
+version: 0.1
 """
 import numpy as np
 from .utils import kron

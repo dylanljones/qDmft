@@ -4,7 +4,7 @@ Created on 14 Feb 2019
 author: Dylan
 
 project: qDmft
-version: 1.0
+version: 0.1
 """
 import numpy as np
 from itertools import product
