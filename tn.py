@@ -9,8 +9,8 @@ version: 0.1
 import numpy as np
 import scipy.linalg as la
 from scitools import Plot
-from qsim import Statevector, STATES, ONE, ZERO
-from qsim.gates import *
+from qsim2 import Statevector, STATES
+from qsim2.gates import *
 
 
 def show_measurement_hist(tensor, idx, n=1000):
@@ -52,43 +52,41 @@ def notc_gate():
     return gate
 
 
-class Qubit:
+def initialize_qubits(arg):
+    if isinstance(arg, int):
+        qubits = [Qubit(0)] * arg
+    else:
+        qubits = [Qubit(x) for x in arg]
+    return qubits
 
-    def __init__(self, x):
-        if isinstance(x, str):
-            s = STATES[x]
-        else:
-            s = ONE if x else ZERO
-        self.state = np.asarray(s)
 
-    def __str__(self):
-        return str(self.state)
+class Qubit(np.ndarray):
 
-    def apply_gate(self, gate):
-        self.state = np.dot(gate, self.state)
+    def __new__(cls, arg, dtype=None):
+        if isinstance(arg, int):
+            arg = str(arg)
+        if isinstance(arg, str):
+            arg = STATES[arg]
+        return np.asarray(arg, dtype).view(cls)
 
-    def kron(self, other):
-        return np.kron(self.state, other.state)
 
 
 def main():
-    q1, q2 = Qubit(1), Qubit(0)
-    qubits = q1, q2
-    n = len(qubits)
+    qubits = initialize_qubits("100")
+    q1, q2, q3 = qubits
 
-    # qubits[0] = np.dot(X_GATE, qubits[0])
-    # qubits[0] = np.dot(HADAMARD_GATE, qubits[0])
-
-    state = q1.kron(q2).squeeze()
-    # state = kron(qubits).squeeze()
-    print(state)
+    state = kron(qubits)
     s = Statevector(state)
     print(s)
 
     tensor = s.tensor()
     print(tensor)
+    s.from_tensor(tensor)
+    print(s)
+
+
     cnot = cnot_gate()
-    res = np.einsum("i...,j...,ijkl", q1.state, q2.state, cnot)
+    res = np.einsum("i,j,k, ijkl", q1, q2, q3, cnot)
     s.from_tensor(res)
     print(s)
 
