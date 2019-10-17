@@ -6,6 +6,8 @@ author: Dylan Jones
 project: qDmft
 version: 0.1
 """
-from .states import *
-from .utils import kron
-from .statevector import *
+from .utils import *
+from .gates import *
+from .instruction import *
+from .backends import StateVector
+from .circuit import Circuit

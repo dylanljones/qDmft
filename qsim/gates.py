@@ -7,11 +7,9 @@ project: qDmft
 version: 0.1
 """
 import numpy as np
-from .utils import kron
-from .states import P0, P1
+from itertools import product
+from .utils import kron, P0, P1
 
-eye2 = np.eye(2)
-zero2 = np.zeros((2, 2))
 
 # ======================== SINGLE QUBIT GATES =======================
 
@@ -22,32 +20,45 @@ HADAMARD_GATE = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
 PHASE_GATE = np.array([[1, 0], [0, 1j]])
 T_GATE = np.array([[1, 0], [0, np.exp(1j*np.pi/4)]])
 
-pauli = X_GATE, Y_GATE, Z_GATE
+pauli = np.eye(2), X_GATE, Y_GATE, Z_GATE
 
 
-def eyes(n, size=2):
-    return [np.eye(size)] * n
+def id_gate(args):
+    return pauli[0]
 
 
-def single_gate(idx, gate, n):
-    arrs = eyes(n)
-    arrs[idx] = gate
-    return kron(arrs)
+def x_gate(args):
+    return X_GATE
 
 
-# ---------------- ROTATION GATES -----------------------------------
+def y_gate(args):
+    return Y_GATE
+
+
+def z_gate(args):
+    return Z_GATE
+
+
+def h_gate(args):
+    return HADAMARD_GATE
+
+
+def s_gate(args):
+    return PHASE_GATE
+
+
+def t_gate(args):
+    return T_GATE
 
 
 def rx_gate(phi=0):
     arg = phi / 2
-    return np.array([[np.cos(arg), -1j*np.sin(arg)],
-                     [-1j*np.sin(arg), np.cos(arg)]])
+    return np.array([[np.cos(arg), -1j*np.sin(arg)], [-1j*np.sin(arg), np.cos(arg)]])
 
 
 def ry_gate(phi=0):
     arg = phi / 2
-    return np.array([[np.cos(arg), -np.sin(arg)],
-                     [+np.sin(arg), np.cos(arg)]])
+    return np.array([[np.cos(arg), -np.sin(arg)], [+np.sin(arg), np.cos(arg)]])
 
 
 def rz_gate(phi=0):
@@ -55,19 +66,83 @@ def rz_gate(phi=0):
     return np.array([[np.exp(-arg), 0], [0, np.exp(arg)]])
 
 
-# ======================== TWO QUBIT GATES ===========================
+GATE_DICT = {"i": id_gate, "x": x_gate, "y": y_gate, "z": z_gate,
+             "h": h_gate, "s": s_gate, "t": t_gate,
+             "rx": rx_gate, "ry": ry_gate, "rz": rz_gate}
+
+
+# =========================================================================
+
+def single_gate(qbits, gate, n):
+    """ Builds matrix of a n-bit control gate
+
+    Parameters
+    ----------
+    qbits: int or list of int
+        Index of control-qubit(s)
+    t: int
+        Index of target qubit
+    gate: array_like
+        Matrix of the gate that is controlled
+    n: int, optional
+        Total number of qubits. If not specified
+        number of involved qubits is used
+    Returns
+    -------
+    gate: np.ndarray
+    """
+    if not hasattr(qbits, "__len__"):
+        qbits = [qbits]
+    eye = np.eye(2)
+    arrs = list()
+    for i in range(n):
+        arrs.append(gate if i in qbits else eye)
+    return kron(arrs)
+
 
 def get_projection(*items, n):
-    parts = eyes(n)
+    parts = [np.eye(2)] * n
     for idx, proj in items:
         parts[idx] = proj
     return parts
 
 
-def control_gate(control, target, gate, n=2):
-    parts = get_projection((control, P0), n=n)
-    parts2 = get_projection((control, P1), (target, gate), n=n)
-    return kron(parts) + kron(parts2)
+def cgate(con, t, gate, n=None):
+    """ Builds matrix of a n-bit control gate
+
+    Parameters
+    ----------
+    con: int or list of int
+        Index of control-qubit(s)
+    t: int
+        Index of target qubit
+    gate: array_like
+        Matrix of the gate that is controlled
+    n: int, optional
+        Total number of qubits. If not specified
+        number of involved qubits is used
+    Returns
+    -------
+    gate: np.ndarray
+    """
+    if not hasattr(con, "__len__"):
+        con = [con]
+    n = n or max(*con, t) + 1
+    gate = np.asarray(gate)
+    array = 0
+    for vals in product([0, 1], repeat=len(con)):
+        # Projections without applying gate
+        projections = [P1 if x else P0 for x in vals]
+        items = list(zip(con, projections))
+        if np.all(vals):
+            # Projection with applying gate
+            items.append((t, gate))
+        # Build projection array and add to matrix
+        array = array + kron(get_projection(*items, n=n))
+    return array
+
+
+# =========================================================================
 
 
 def swap_single_cgate(gate):
@@ -75,11 +150,3 @@ def swap_single_cgate(gate):
     gate_tensor = np.swapaxes(gate_tensor, 0, 1)  # Switch qubit 1
     gate_tensor = np.swapaxes(gate_tensor, 2, 3)  # Switch qubit 2
     return gate_tensor.reshape((4, 4))            # reshape 2x2x2x2 tensor to 4x4 gate
-
-
-def cc_gate(c1, c2, t, gate, n):
-    arrs1 = get_projection((c1, P0), (c2, P0), n=n)
-    arrs2 = get_projection((c1, P0), (c2, P1), n=n)
-    arrs3 = get_projection((c2, P0), (c1, P1), n=n)
-    arrs4 = get_projection((c1, P1), (c2, P1), (t, gate), n=n)
-    return kron(arrs1) + kron(arrs2) + kron(arrs3) + kron(arrs4)

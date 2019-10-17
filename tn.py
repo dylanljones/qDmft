@@ -9,8 +9,8 @@ version: 0.1
 import numpy as np
 import scipy.linalg as la
 from scitools import Plot
-from qsim2 import Statevector, STATES
-from qsim2.gates import *
+from qsim import StateVector, STATES
+from qsim.gates import *
 
 
 def show_measurement_hist(tensor, idx, n=1000):
@@ -70,20 +70,18 @@ class Qubit(np.ndarray):
         return np.asarray(arg, dtype).view(cls)
 
 
-
 def main():
     qubits = initialize_qubits("100")
     q1, q2, q3 = qubits
 
     state = kron(qubits)
-    s = Statevector(state)
+    s = StateVector(state)
     print(s)
 
     tensor = s.tensor()
     print(tensor)
     s.from_tensor(tensor)
     print(s)
-
 
     cnot = cnot_gate()
     res = np.einsum("i,j,k, ijkl", q1, q2, q3, cnot)

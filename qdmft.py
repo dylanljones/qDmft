@@ -9,10 +9,10 @@ version: 0.1
 import numpy as np
 from dmft.greens import gf_omega_fft
 from dmft.twosite import impurity_gf_ref
-from qsim import kron
-from qsim.statevector import Statevector
-from qsim.gates import X_GATE, Y_GATE, Z_GATE, HADAMARD_GATE, pauli
-from qsim.gates import control_gate, rx_gate
+from _qsim import kron
+from _qsim.statevector import Statevector
+from _qsim.gates import X_GATE, Y_GATE, Z_GATE, HADAMARD_GATE, pauli
+from _qsim.gates import control_gate, rx_gate
 from scitools import Matrix, Plot
 
 eye = np.eye(2)
@@ -51,7 +51,7 @@ def sigma_z(*indices, n=5):
     return kron(gates)
 
 
-def qu_hamiltonian(u, mu, eps_bath, v):
+def qhamiltonian(u, mu, eps_bath, v):
     h1 = u/2 * (sigma_z(1, 3) - sigma_z(1) - sigma_z(3))
     h2 = mu/2 * (sigma_z(1) + sigma_z(3))
     h3 = eps_bath/2 * (sigma_z(2) + sigma_z(4))
