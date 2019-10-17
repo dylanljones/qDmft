@@ -85,13 +85,11 @@ class Circuit:
             string += "\n   " + str(inst)
         return string
 
-    def print(self, maxwidth=None, vals=None):
-        s = CircuitString(self.qbits, maxwidth=maxwidth)
+    def print(self, padding=1, maxwidth=None):
+        s = CircuitString(self.qbits, padding)
         for instructions in self.instructions:
             s.add(instructions)
-        if vals is not None:
-            s.add_endstate(vals)
-        print(s)
+        print(s.build(wmax=maxwidth))
 
     def show(self):
         pass

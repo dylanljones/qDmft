@@ -6,6 +6,7 @@ author: Dylan Jones
 project: qDmft
 version: 0.1
 """
+import os
 import numpy as np
 import scipy.linalg as la
 from scipy import optimize
@@ -17,7 +18,7 @@ si, sx, sy, sz = pauli
 
 
 class VqeResult(optimize.OptimizeResult):
-    
+
     def __init__(self, sol, gs_ref=0):
         super().__init__(x=sol.x, success=sol.success, message=sol.message,
                          nfev=sol.nfev, njev=sol.njev, nit=sol.nit)
@@ -106,7 +107,7 @@ def hamiltonian(u=4, v=1, eps_bath=2, mu=2):
     return 1/2 * (h1 + h2 + h3 + h4)
 
 
-def circuit(depth=2):
+def vqe_circuit(depth=2):
     c = Circuit(4)
     c.h(0)
     for i in range(depth):
@@ -120,20 +121,24 @@ def circuit(depth=2):
     return c
 
 
-def run_vqe():
-    ham = hamiltonian()
-    c = circuit(2)
-    vqe = VqeSolver(ham, c)
-    vqe.solve()
-    vqe.save("vqe")
-    print(vqe.res)
-    return vqe.circuit
+def get_opt_circuit(file="circuits/vqe.circ", new=False, depth=2):
+    if new or not os.path.isfile(file):
+        print("Optimizing Vqe circuit")
+        vqe = VqeSolver(hamiltonian(), vqe_circuit(depth))
+        vqe.solve()
+        print(vqe.res)
+        vqe.save(file)
+        print(f"Saving circuit: {file}")
+        return vqe.circuit
+    else:
+        print(f"Loading circuit: {file}")
+        return Circuit.load(file)
 
 
 def main():
-    # c = run_vqe()
-    c = Circuit.load("vqe.circ")
-    c.print()
+    c = get_opt_circuit()
+    # c = Circuit.load("vqe.circ")
+    # c.print()
 
 
 if __name__ == "__main__":

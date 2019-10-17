@@ -106,84 +106,133 @@ def inner_indices(n, indices1, indices2):
     return [i for i in range(n) if o1 < i < o2]
 
 
+def centered(s1, s2, s3, pad=1):
+    width = len(s1) + pad * 2
+    return [f"{s1: ^{width}}", f"{s2:-^{width}}", f"{s3: ^{width}}"]
+
+
 class CircuitString(Visualizer):
 
-    def __init__(self, n, blockwidth=7, maxwidth=None):
+    def __init__(self, n, padding=1):
         super().__init__(n)
-        layer0 = [state_block()] * n
-        self.layers = [layer0]
-        self.width = blockwidth
-        self.maxwidth = maxwidth
+        self.m_line = " " * 5
+        self.widths = list([5])
+        self.layers = [self.state_layer()]
+        self.padding = padding
 
     @property
     def layer(self):
         return self.layers[-1]
 
     @property
+    def idx(self):
+        return self.num_layers - 1
+
+    @property
     def num_layers(self):
         return len(self.layers)
 
+    def state_layer(self, vals=None):
+        if vals is None:
+            vals = np.zeros(self.n, "int")
+        layer0 = list()
+        w = 0
+        for val in vals:
+            state = f"|{val}>--"
+            space = " " * len(state)
+            layer0.append([space, state, space])
+            w = max(w, len(state))
+        return layer0
+
+    @staticmethod
+    def _empty(w=1):
+        empty = "" # " " * w
+        line = "" # "-" * w
+        return [empty, line, empty]
+
+    @staticmethod
+    def _line(char=" ", w=1):
+        empty = f"{char: ^{w}}"
+        line = "-" * w
+        return [empty, line, empty]
+
+    @staticmethod
+    def _gate_line(w, text="", inner=" "):
+        return f"|{text:{inner}^{w}}|"
+
+    def _add_to_row(self, row, strings):
+        for i in range(len(strings)):
+            self.layer[row][i] += strings[i]
+
     def next_layer(self):
-        layer = [empty_block(self.width) for _ in range(self.n)]
+        self.widths.append(0)
+        layer = [self._empty() for _ in range(self.n)]
         self.layers.append(layer)
 
-    def centered(self, s1, s2, s3):
-        return [f"{s1: ^{self.width}}", f"{s2:-^{self.width}}", f"{s3: ^{self.width}}"]
+    def add_gate(self, indices, name, pad=0):
+        if not hasattr(indices, "__len__"):
+            indices = [indices]
 
-    def add_gate(self, indices, name):
         w = len(name) + 2
-        name = f"| {name} |"
+        space = self._gate_line(w)
+        name = self._gate_line(w, name)
+        line = self._gate_line(w, inner="-")
         edge = "+" + "-" * w + "+"
-        line = "|" + "-" * w + "|"
-        space = "|" + " " * w + "|"
+        width = len(name) + 2 * pad
         r0, r1 = outer_indices(indices, indices)
         inner = inner_indices(self.n, indices, indices)
         if r0 == r1:
-            self.layer[r0] = self.centered(edge, name, edge)
-            return
-        self.layer[r0] = self.centered(edge, name, space)
-        self.layer[r1] = self.centered(space, space, edge)
-        for i, row in enumerate(inner):
-            self.layer[row] = self.centered(space, space if row in indices else line, space)
+            # self._add_to_row(r0, centered(edge, name, edge, pad))
+            self.layer[r0] = centered(edge, name, edge, pad)
+        else:
+            # self._add_to_row(r0, centered(edge, name, space, pad))
+            # self._add_to_row(r1, centered(space, space, edge, pad))
+            self.layer[r0] = centered(edge, name, space, pad)
+            self.layer[r1] = centered(space, space, edge, pad)
+            for i, row in enumerate(inner):
+                # self._add_to_row(row, centered(space, space if row in indices else line, space, pad))
+                self.layer[row] = centered(space, space if row in indices else line, space, pad)
+        self.widths[-1] = max(width, self.widths[-1])
 
-    def set_char(self, row, line, idx, char):
-        string = self.layer[row][line]
-        self.layer[row][line] = set_char(string, idx, char)
-
-    def set_chars(self, row, idx, chars):
-        for i, char in enumerate(chars):
-            self.set_char(row, i, idx, char)
-
-    def add_control_gate(self, gate):
+    def add_control_gate(self, gate, pad=0):
         idx = gate.qbits
         con = gate.con
-        self.add_gate(idx, gate.name.replace("c", ""))
+        self.add_gate(idx, gate.name.replace("c", ""), pad)
         # Connect control qubits
         con_out, idx_out = outer_indices(con, idx)
         x0, x1 = sorted([con_out, idx_out])
         con_in = [row for row in con if x0 < row < x1]
-        c = int(self.width / 2)
+        con_row = ["|", "O", "|"]
+        cross_row = ["|", "+", "|"]
         # Draw inner sections
         for row in range(self.n):
             if row in con_in:
-                self.set_chars(row, c, ["|", "O", "|"])
+                self.layer[row] = con_row
             elif x0 < row < x1:
-                self.set_chars(row, c, ["|", "+", "|"])
+                self.layer[row] = cross_row
         # Draw outer control qubit
         idx = np.sign(idx_out - con_out)
-        self.set_char(con_out, 1, c, "O")
-        self.set_char(con_out, 1 + idx, c, "|")
-        self.set_char(con_out, 1 - idx, c, " ")
+        outer = ["O"] * 3
+        outer[1 + idx] = "|"
+        outer[1 - idx] = " "
+        self.layer[con_out] = outer
 
-    def add(self, instructions):
+    def add_measurement(self, qbits, cbits):
+        for q, c in zip(qbits, cbits):
+            self.add_gate(q, f"M {c}")
+
+    def add(self, inst, padding=0):
         self.next_layer()
-        if not hasattr(instructions, "__len__"):
-            instructions = [instructions]
-        for inst in instructions:
-            if inst.is_controlled:
-                self.add_control_gate(inst)
-            else:
-                self.add_gate(inst.qbits, inst.name)
+        if inst.name.lower() == "m":
+            self.add_measurement(inst.qbits, inst.cbits)
+        elif inst.is_controlled:
+            self.add_control_gate(inst, padding)
+        else:
+            name = inst.name
+            if inst.arg is not None:
+                name += f" ({inst.arg:.1f})"
+            for q in inst.qbits:
+                self.add_gate([q], name, padding)
 
     def add_end(self, width=2):
         self.next_layer()
@@ -192,18 +241,36 @@ class CircuitString(Visualizer):
         for i in range(self.n):
             self.layer[i] = [space, line, space]
 
-    def add_endstate(self, vals, decimals=2):
-        self.next_layer()
-        for i in range(self.n):
-            state = f"--|{vals[i]:.{decimals}}>"
-            space = " " * len(state)
-            self.layer[i] = [space, state, space]
+    def add_layer(self, lines, idx, padding=0):
+        i = 0
+        width = self.widths[idx]
+        space_pad, line_pad = " " * padding, "-" * padding
+        for row in self.layers[idx]:
+            if idx == 0:
+                lines[i + 0] += f"{row[0]: ^{width}}"
+                lines[i + 1] += f"{row[1]:-^{width}}"
+                lines[i + 2] += f"{row[2]: ^{width}}"
+            else:
+                lines[i + 0] += f"{row[0]: ^{width + 2 *padding}}"
+                lines[i + 1] += f"{row[1]:-^{width + 2 * padding}}"
+                lines[i + 2] += f"{row[2]: ^{width + 2 * padding}}"
+            i += 3
+        return lines
 
-    def build(self):
-        header = "".join([f"{i: ^{self.width}}" for i in range(1, self.num_layers)])
-        string = " " * 6 + header + "\n"
-        string += build_string(self.layers, self.n, self.maxwidth)
-        return string
+    def build(self, padding=None, wmax=None):
+        pad = padding if padding is not None else self.padding
+        circ_lines = [""] * 3 * self.n
+        for i in range(self.num_layers):
+            circ_lines = self.add_layer(circ_lines, i, pad)
+        if wmax is not None:
+            for i, string in enumerate(circ_lines):
+                circ_lines[i] = string[:wmax]
+
+        widths = np.asarray(self.widths)
+        widths[1:] += 2 * pad
+        header = "".join([f"{i: ^{widths[i]}}" for i in range(1, self.num_layers)])
+        string = " " * widths[0] + header + "\n"
+        return string + "\n".join(circ_lines)
 
     def __str__(self):
         return self.build()

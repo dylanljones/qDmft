@@ -1,0 +1,4 @@
+qubits=2; clbits=2; 
+idx=0; name=H; qbits=[0]; con=None; cbits=None; arg=None; argidx=None; 
+idx=1; name=cX; qbits=[1]; con=[0]; cbits=None; arg=None; argidx=None; 
+idx=2; name=m; qbits=[0 1]; con=None; cbits=[0 1]; arg=None; argidx=None; 

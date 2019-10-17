@@ -38,16 +38,17 @@ class StateVector(Backend):
 
     name = "statevector"
 
-    def __init__(self, qubits, basis=None):
+    def __init__(self, qubits, basis=None, amp=None):
 
         super().__init__(qubits, basis)
         self.n = 2 ** qubits
         self.amp = None
-        self.init()
+        self.snapshots = list()
 
-    def init(self):
-        self.amp = kron([ZERO] * self.nbits)
+        self.init(amp)
 
+    def init(self, amp=None):
+        self.amp = kron([ZERO] * self.nbits) if amp is None else np.copy(amp)
     @property
     def norm(self):
         return la.norm(self.amp)
@@ -74,6 +75,10 @@ class StateVector(Backend):
         if show:
             plot.show()
         return plot
+
+    def save_snapshot(self):
+        s = StateVector(self.nbits, self.basis, self.amp)
+        self.snapshots.append(s)
 
     def state(self):
         return self.amp
@@ -126,5 +131,7 @@ class StateVector(Backend):
         self.amp = projected / la.norm(projected)
         return value
 
-    def measure(self, qbits):
+    def measure(self, qbits, snapshot=True):
+        if snapshot:
+            self.save_snapshot()
         return [self._measure_qubit(q) for q in to_array(qbits)]
