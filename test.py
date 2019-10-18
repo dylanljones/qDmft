@@ -28,33 +28,61 @@ def get_circuit(file="circuits/test.circ", new=False):
         return Circuit.load(file)
 
 
-class Result(np.ndarray):
+def histogram(data, normalize=True):
+    n, n_bins = data.shape
+    binvals = np.power(2, np.arange(n_bins))[::-1]
+    data = np.sum(data * binvals[np.newaxis, :], axis=1)
+    hist, edges = np.histogram(data, bins=np.arange(2 ** n_bins+1))
+    bins = edges[:-1]  # + 0.5
+    if normalize:
+        hist = hist / n
+    return bins, hist
 
-    def __new__(cls, inputarr, dtype=None):
-        obj = np.asarray(inputarr, dtype).view(cls)
-        return obj
+
+class Result:
+
+    def __init__(self, data):
+        self.data = None
+        self.hist = None
+        self.load(data)
+
+    def load(self, data):
+        self.data = data
+        self.hist = np.asarray(histogram(data, normalize=True))
+
+    @property
+    def shape(self):
+        return self.data.shape
 
     @property
     def n(self):
         return self.shape[0]
 
-    def hist(self):
-        n, nbits = self.shape
-        binvals = np.power(2, np.arange(nbits))[::-1]
-        data = np.sum(self * binvals[np.newaxis, :], axis=1)
-        hist, edges = np.histogram(data, bins=np.arange(2 ** nbits+1))
-        bins = edges[:-1] + 0.5
-        return bins, hist / n
+    def sorted(self):
+        probs = self.hist[1]
+        indices = np.argsort(probs)[::-1]
+        return np.asarray([indices, probs[indices]]).T
+
+    def show_histogram(self, show=True):
+        bins, hist = self.hist
+        plot = Plot()
+        plot.ax.bar(bins, hist, width=0.9)
+        plot.grid(which="y")
+        if show:
+            plot.show()
 
 
 def main():
     c = get_circuit()
-
+    c.print()
     res = Result(c.run(100))
-    print(res.hist())
+    print(f"Results after {res.n} runs:")
+    for x, p in res.sorted():
+        print(f"{x}; {p}")
 
+    res.show_histogram()
 
-    c.show_histogram()
+    # c.show_histogram()
     # print(c.backend.snapshots[-1])
     # print(c.backend)
 
