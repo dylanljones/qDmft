@@ -20,11 +20,68 @@ def get_info(string, key, delim="; "):
     return re.search(pre + r'(.*?)' + delim, string).group(1)
 
 
-def str_to_list(string, dtype=int):
-    if string.strip() == "None":
-        return None
-    string = string[1:-1]
-    return [dtype(x) for x in string.split(" ")]
+def histogram(data, normalize=True):
+    n, n_bins = data.shape
+    binvals = np.power(2, np.arange(n_bins))[::-1]
+    data = np.sum(data * binvals[np.newaxis, :], axis=1)
+    hist, edges = np.histogram(data, bins=np.arange(2 ** n_bins+1))
+    bins = edges[:-1].astype("int")  # + 0.5
+    if normalize:
+        hist = hist / n
+    return bins, hist
+
+
+class Result:
+
+    def __init__(self, data, basis_labels):
+        self.labels = basis_labels
+        self.data = None
+        self.hist = None
+
+        self.load(data)
+
+    def load(self, data, normalize=True):
+        self.data = data
+        self.hist = histogram(data, normalize)
+
+    @property
+    def shape(self):
+        return self.data.shape
+
+    @property
+    def n(self):
+        return self.shape[0]
+
+    def mean(self):
+        return self.sorted[0]
+
+    def sorted(self):
+        bins, probs = self.hist
+        indices = np.argsort(probs)[::-1]
+        return [(bins[i], probs[i]) for i in indices]
+
+    def highest(self, thresh=0.7):
+        res_sorted = self.sorted()
+        pmax = res_sorted[0][1]
+        return [(self.labels[i], p) for i, p in res_sorted if p >= thresh * pmax]
+
+    def show_histogram(self, show=True):
+        bins, hist = self.hist
+        plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1))
+        plot.set_title(f"N={self.n}")
+        plot.grid(axis="y")
+        plot.set_ticks(bins, np.arange(0, 1.1, 0.1))
+        plot.set_ticklabels(self.labels)
+        plot.ax.bar(bins, hist, width=0.9)
+        if show:
+            plot.show()
+
+
+    def __str__(self):
+        entries = [f"   {label} {p:.3f}" for label, p in self.highest()]
+        string = f"Result ({self.n} shots):\n"
+        string += "\n".join(entries)
+        return string
 
 
 class Circuit:
@@ -75,6 +132,23 @@ class Circuit:
             inst.idx = n + i
             self.instructions.append(inst)
         Instruction.INDEX = len(self.instructions)
+
+
+    def add_qubit(self, idx=0):
+        self.qbits += 1
+        self.basis = Basis(self.qbits)
+        self.backend.set_qubits(self.qbits)
+        for inst in self.instructions:
+            inst.insert_qubit(idx)
+
+        if self.qbits == self.cbits + 1:
+            self.add_clbit()
+
+    def add_clbit(self):
+        self.cbits += 1
+        self.data = np.zeros(self.cbits)
+
+    # =========================================================================
 
     def __repr__(self):
         return f"Circuit(qubits: {self.qbits}, clbits: {self.cbits})"
@@ -234,37 +308,11 @@ class Circuit:
         data = np.zeros((shots, self.data.shape[0]))
         for i in range(shots):
             data[i] = self.run_shot(*args, **kwargs)
-        self.res = data
+        self.res = Result(data, self.basis.labels)
         return self.res
 
     def histogram(self):
-        n, nbits = self.res.shape
-        binvals = np.power(2, np.arange(nbits))[::-1]
-        data = np.sum(self.res * binvals[np.newaxis, :], axis=1)
-        hist, edges = np.histogram(data, bins=np.arange(2 ** nbits+1))
-        bins = edges[:-1] + 0.5
-        return bins, hist / n
+        return self.res.hist
 
     def show_histogram(self, show=True):
-        n = self.res.shape[0]
-        bins, hist = self.histogram()
-        idx = np.argmax(hist)
-        ymax = hist[idx]
-        result = self.basis.labels[idx]
-        limits = np.asarray([np.max(bins) + 0.5, ymax*1.2])
-
-        plot = Plot(ylabel="Probability", ylim=(0, limits[1]))
-        plot.ax.bar(bins, hist, width=0.9)
-        plot.grid(axis="y")
-        plot.set_ticks(bins)
-        plot.set_ticklabels(self.basis.labels)
-
-        col = "r"
-        plot.draw_lines(y=ymax, ls="-", lw=1, color=col)
-        pos = (bins[idx], ymax*1.01)
-        plot.ax.text(*pos, s=f"{result}\np={ymax:.2f}", color=col, ha="center", va="bottom")
-
-        plot.text(0.99 * limits, f"N={n}", ha="right", va="top")
-        if show:
-            plot.show()
-        return plot
+        return self.res.show_histogram(show)

@@ -102,11 +102,20 @@ class BitList:
             indices = to_array(indices)
         self.indices = indices
 
+    def insert(self, idx):
+        if self.indices is not None:
+            for i in range(len(self.indices)):
+                if self.indices[i] >= idx:
+                    self.indices[i] += 1
+
     def __bool__(self):
         return self.indices is not None
 
     def __getitem__(self, item):
         return self.indices[item]
+
+    def __setitem__(self, item, value):
+        self.indices[item] = value
 
     def __len__(self):
         return len(self.indices)
@@ -183,6 +192,10 @@ class Instruction:
     @property
     def arg(self):
         return self.pmap.get(self.idx)
+
+    def insert_qubit(self, idx):
+        self.qbits.insert(idx)
+        self.con.insert(idx)
 
     def _attr_str(self):
         parts = [self.name, f"ID: {self.idx}"]

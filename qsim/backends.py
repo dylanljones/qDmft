@@ -19,6 +19,10 @@ class Backend:
         self.nbits = qubits
         self.basis = basis or Basis(qubits)
 
+    def set_qubits(self, qubits, basis=None):
+        self.nbits = qubits
+        self.basis = basis or Basis(qubits)
+
     def state(self):
         pass
 
@@ -39,16 +43,20 @@ class StateVector(Backend):
     name = "statevector"
 
     def __init__(self, qubits, basis=None, amp=None):
-
         super().__init__(qubits, basis)
         self.n = 2 ** qubits
         self.amp = None
         self.snapshots = list()
-
         self.init(amp)
 
     def init(self, amp=None):
         self.amp = kron([ZERO] * self.nbits) if amp is None else np.copy(amp)
+
+    def set_qubits(self, qubits):
+        super().set_qubits(qubits)
+        self.n = 2 ** qubits
+        self.init(None)
+
     @property
     def norm(self):
         return la.norm(self.amp)
