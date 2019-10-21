@@ -28,25 +28,50 @@ def get_circuit(new=False, file="circuits/test.circ"):
         return Circuit.load(file)
 
 
+class Register(list):
+
+    INDEX = 0
+
+    def __init__(self, size):
+        self.idx = Register.INDEX
+        Register.INDEX += 1
+        super().__init__(range(size))
+
+    @property
+    def n(self):
+        return len(self)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(idx: {self.idx}, size: {self.n})"
+
+
+class QuRegister(Register):
+
+    def __init__(self, size):
+        super().__init__(size)
+
+
+class ClRegister(Register):
+
+    def __init__(self, size, values=0):
+        super().__init__(size)
+        if not hasattr(values, "__len__"):
+            values = np.ones(size) * values
+        self.values = np.asarray(values)
+
+    @classmethod
+    def like(cls, register):
+        return cls(register.n)
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(idx: {self.idx}, values: {self.values})"
+
+
 def main():
-    # c = get_circuit(True)
-    # print(c)
-    # c.print()
-    c = Circuit(2)
-    c.h(0)
-    c.cx(0, 1)
-    # c.m()
-    print(c)
-    c.add_qubit(0)
-    print(c)
-
-    c.m()
-
-    c.print()
-    res = c.run(100)
-    print(res)
-    res.show_histogram()
-
+    qreg = QuRegister(3)
+    creg = ClRegister.like(qreg)
+    print(qreg)
+    print(creg)
 
 
 if __name__ == "__main__":

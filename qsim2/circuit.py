@@ -9,21 +9,11 @@ version: 1.0
 import re
 import numpy as np
 from scitools import Plot
-from .utils import Basis, get_info
+from .register import Qubit, Clbit
+from .utils import Basis, get_info, to_list, histogram
 from .visuals import CircuitString
 from .instruction import Gate, Measurement, Instruction, ParameterMap
 from .backends import StateVector
-
-
-def histogram(data, normalize=True):
-    n, n_bins = data.shape
-    binvals = np.power(2, np.arange(n_bins))[::-1]
-    data = np.sum(data * binvals[np.newaxis, :], axis=1)
-    hist, edges = np.histogram(data, bins=np.arange(2 ** n_bins+1))
-    bins = edges[:-1].astype("int")  # + 0.5
-    if normalize:
-        hist = hist / n
-    return bins, hist
 
 
 class CircuitResult:
@@ -65,7 +55,7 @@ class CircuitResult:
         plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1))
         plot.set_title(f"N={self.n}")
         plot.grid(axis="y")
-        plot.set_ticks(bins, np.arange(0, 1.1, 0.1))
+        plot.set_ticks(bins, np.arange(0, 1.1, 0.2))
         plot.set_ticklabels(self.labels)
         plot.ax.bar(bins, hist, width=0.9)
         if show:
@@ -78,36 +68,48 @@ class CircuitResult:
         return string
 
 
+def init_bits(arg, bit_type):
+    qubits = None
+    if isinstance(arg, int):
+        qubits = [bit_type(i) for i in range(arg)]
+    elif isinstance(arg, bit_type):
+        qubits = [arg]
+    elif isinstance(arg, list):
+        qubits = arg
+    return qubits
+
+
 class Circuit:
 
     def __init__(self, qubits, clbits=None, backend=StateVector.name):
-        self.qbits = qubits
-        self.cbits = clbits or qubits
-        self.basis = Basis(self.qbits)
+        self.qubits = init_bits(qubits, Qubit)
+        if clbits is None:
+            clbits = len(self.qubits)
+        self.clbits = init_bits(clbits, Clbit)
+        self.basis = Basis(self.n_qubits)
         self.instructions = list()
         self.pmap = ParameterMap.instance()
         self.res = None
 
         if backend == StateVector.name:
-            self.backend = StateVector(self.qbits, self.basis)
+            self.backend = StateVector(self.qubits, self.basis)
         else:
             raise ValueError("Invalid backend: " + backend)
 
     @classmethod
     def like(cls, other):
-        return cls(other.qbits, other.cbits, other.backend.name)
-
-    def init(self):
-        self.backend.init()
-
-    def init_params(self, *args):
-        self.pmap.init(*args)
-
-    def set_params(self, args):
-        self.pmap.set_params(args)
+        return cls(other.qubits, other.clbits, other.backend.name)
 
     @property
-    def num_params(self):
+    def n_qubits(self):
+        return len(self.qubits)
+
+    @property
+    def n_clbits(self):
+        return len(self.clbits)
+
+    @property
+    def n_params(self):
         return len(self.pmap.params)
 
     @property
@@ -118,30 +120,19 @@ class Circuit:
     def args(self):
         return self.pmap.args
 
-    def append(self, circuit):
-        n = len(self.instructions)
-        for i, inst in enumerate(circuit.instructions):
-            inst.idx = n + i
-            self.instructions.append(inst)
-        Instruction.INDEX = len(self.instructions)
+    def init(self):
+        self.backend.init()
 
-    def add_qubit(self, idx=0):
-        self.qbits += 1
-        self.basis = Basis(self.qbits)
-        self.backend.set_qubits(self.qbits)
-        for inst in self.instructions:
-            inst.insert_qubit(idx)
+    def init_params(self, *args):
+        self.pmap.init(*args)
 
-        if self.qbits == self.cbits + 1:
-            self.add_clbit()
-
-    def add_clbit(self):
-        self.cbits += 1
+    def set_params(self, args):
+        self.pmap.set_params(args)
 
     # =========================================================================
 
     def __repr__(self):
-        return f"Circuit(qubits: {self.qbits}, clbits: {self.cbits})"
+        return f"Circuit(qubits: {self.qubits}, clbits: {self.clbits})"
 
     def __str__(self):
         string = self.__repr__()
@@ -150,7 +141,7 @@ class Circuit:
         return string
 
     def print(self, padding=1, maxwidth=None):
-        s = CircuitString(self.qbits, padding)
+        s = CircuitString(len(self.qubits), padding)
         for instructions in self.instructions:
             s.add(instructions)
         print(s.build(wmax=maxwidth))
@@ -159,7 +150,7 @@ class Circuit:
         pass
 
     def to_string(self, delim="; "):
-        info = [f"qubits={self.qbits}", f"clbits={self.cbits}"]
+        info = [f"qubits={self.n_qubits}", f"clbits={self.n_clbits}"]
         string = "".join([x + delim for x in info])
         lines = [string]
         for inst in self.instructions:
@@ -167,43 +158,43 @@ class Circuit:
             lines.append(string)
         return "\n".join(lines)
 
-    @classmethod
-    def from_string(cls, string, delim="; "):
-        lines = string.splitlines()
-        info = lines.pop(0)
-        qbits = int(get_info(info, "qubits", delim))
-        cbits = int(get_info(info, "clbits", delim))
-        self = cls(qbits, cbits)
-        for line in lines:
-            inst = Instruction.from_string(line, delim)
-            self.add_instruction(inst)
-        return self
-
-    def save(self, file, delim="; "):
-        ext = ".circ"
-        if not file.endswith(ext):
-            file += ext
-        with open(file, "w") as f:
-            f.write(self.to_string(delim))
-
-    @classmethod
-    def load(cls, file, delim="; "):
-        ext = ".circ"
-        if not file.endswith(ext):
-            file += ext
-        with open(file, "r") as f:
-            string = f.read()
-        return cls.from_string(string, delim)
-
     # =========================================================================
 
     def add_instruction(self, inst):
         self.instructions.append(inst)
         return inst
 
-    def add_gate(self, name, qbits, con=None, arg=None, argidx=None):
-        gates = Gate(name, qbits, con=con, arg=arg, argidx=argidx)
+    def _get_qubits(self, bits):
+        if bits is None:
+            return None
+        bitlist = list()
+        for q in to_list(bits):
+            if not isinstance(q, Qubit):
+                q = self.qubits[q]
+            bitlist.append(q)
+        return bitlist
+
+    def _get_clbits(self, bits):
+        if bits is None:
+            return None
+        bitlist = list()
+        for c in to_list(bits):
+            if not isinstance(c, Clbit):
+                c = self.clbits[c]
+            bitlist.append(c)
+        return bitlist
+
+    def add_gate(self, name, qubits, con=None, arg=None, argidx=None):
+        qubits = self._get_qubits(qubits)
+        con = self._get_qubits(con)
+        gates = Gate(name, qubits, con=con, arg=arg, argidx=argidx)
         return self.add_instruction(gates)
+
+    def add_measurement(self, qubits, clbits):
+        qubits = self._get_qubits(qubits)
+        clbits = self._get_clbits(clbits)
+        m = Measurement("m", qubits, clbits)
+        return self.add_instruction(m)
 
     def i(self, qubit):
         return self.add_gate("I", qubit)
@@ -262,34 +253,35 @@ class Circuit:
     def crz(self, con, qubit, arg=0, argidx=None):
         return self.add_gate("Rz", qubit, con, arg, argidx)
 
-    def m(self, qbits=None, cbits=None):
-        if qbits is None:
-            qbits = range(self.qbits)
-        if cbits is None:
-            cbits = qbits
-        self.add_instruction(Measurement("m", qbits, cbits))
+    def m(self, qubits=None, clbits=None):
+        if qubits is None:
+            qubits = range(self.n_qubits)
+        if clbits is None:
+            clbits = range(self.n_qubits)
+        self.add_measurement(qubits, clbits)
 
-    def measure(self, qbits):
-        return self.backend.measure(qbits)
+    def measure(self, qubits):
+        qubits = self._get_qubits(qubits)
+        return self.backend.measure(qubits)
 
     def state(self):
         return self.backend.state()
 
     def run_shot(self, *args, **kwargs):
         self.init()
-        data = np.zeros(self.cbits)
+        data = np.zeros(self.n_clbits)
         for inst in self.instructions:
             if isinstance(inst, Gate):
                 self.backend.apply_gate(inst, *args, **kwargs)
             elif isinstance(inst, Measurement):
-                data = np.zeros(self.cbits)
-                values = self.backend.measure(inst.qbits)
-                for idx, x in zip(inst.cbits, values):
+                data = np.zeros(self.n_clbits)
+                values = self.backend.measure(inst.qubits)
+                for idx, x in zip(inst.cl_indices, values):
                     data[idx] = x
         return data
 
     def run(self, shots=1, *args, **kwargs):
-        data = np.zeros((shots, self.cbits))
+        data = np.zeros((shots, self.n_clbits))
         for i in range(shots):
             data[i] = self.run_shot(*args, **kwargs)
         self.res = CircuitResult(data, self.basis.labels)

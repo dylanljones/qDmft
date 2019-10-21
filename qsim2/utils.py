@@ -42,6 +42,12 @@ def to_array(x, *args, **kwargs):
     return np.asarray(x, *args, **kwargs)
 
 
+def to_list(x):
+    if not hasattr(x, "__len__"):
+        x = [x]
+    return list(x)
+
+
 def str_to_list(string, dtype=int):
     if string.strip() == "None":
         return None
@@ -66,6 +72,17 @@ def basis_strings(n):
 def get_info(string, key, delim="; "):
     pre = key + "="
     return re.search(pre + r'(.*?)' + delim, string).group(1)
+
+
+def histogram(data, normalize=True):
+    n, n_bins = data.shape
+    binvals = np.power(2, np.arange(n_bins))[::-1]
+    data = np.sum(data * binvals[np.newaxis, :], axis=1)
+    hist, edges = np.histogram(data, bins=np.arange(2 ** n_bins+1))
+    bins = edges[:-1].astype("int")  # + 0.5
+    if normalize:
+        hist = hist / n
+    return bins, hist
 
 
 class Basis:

@@ -214,9 +214,6 @@ class Instruction:
                     con=self.con, cbits=self.cbits, arg=self.arg,
                     argidx=self.argidx)
 
-    def to_qasm(self, decimals=2):
-        pass
-
     def to_string(self, delim="; "):
         string = ""
         for key, val in self.to_dict().items():
@@ -238,9 +235,6 @@ class Measurement(Instruction):
         if cbits is None:
             cbits = qbits
         super().__init__(name, qbits, clbits=cbits)
-
-    def to_qasm(self, decimals=2):
-        pass
 
 
 class Gate(Instruction):
