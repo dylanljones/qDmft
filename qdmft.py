@@ -81,7 +81,10 @@ def trotter_step(c, arg):
 def main():
     # c = optimize_circuit(True)
     # c.add_qubit(0, add_clbit=True)
-    arg = np.pi/3
+    tau = 6
+    v = 4
+    n = 2
+    arg = v/2 * tau/n
     c = Circuit(4)
     trotter_step(c, arg)
     c.print()
