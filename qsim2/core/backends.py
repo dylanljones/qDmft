@@ -127,8 +127,9 @@ class StateVector(Backend):
         return arr
 
     def apply_gate(self, gate, *args, **kwargs):
-        arr = self.build_gate(gate)
-        self.amp = np.dot(arr, self.amp)
+        if not isinstance(gate, np.ndarray):
+            gate = self.build_gate(gate)
+        self.amp = np.dot(gate, self.amp)
 
     def _measure_qubit(self, qubit):
         idx = qubit.index

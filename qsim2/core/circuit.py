@@ -18,15 +18,15 @@ from .backends import StateVector
 
 class CircuitResult:
 
-    def __init__(self, data, basis_labels):
-        self.labels = basis_labels
+    def __init__(self, data):
         self.data = None
+        self.basis = None
         self.hist = None
-
         self.load(data)
 
     def load(self, data, normalize=True):
         self.data = data
+        self.basis = Basis(data.shape[1])
         self.hist = histogram(data, normalize)
 
     @property
@@ -36,6 +36,14 @@ class CircuitResult:
     @property
     def n(self):
         return self.shape[0]
+
+    @property
+    def n_bits(self):
+        return self.shape[1]
+
+    @property
+    def labels(self):
+        return self.basis.labels
 
     def mean(self):
         return self.sorted()[0]
@@ -127,7 +135,73 @@ class Circuit:
         self.pmap.init(*args)
 
     def set_params(self, args):
-        self.pmap.set_params(args)
+        self.pmap.set(args)
+
+    def set_param(self, idx, arg):
+        self.pmap[idx] = arg
+
+    # =========================================================================
+
+    def to_string(self, delim="; "):
+        info = [f"qubits={self.n_qubits}", f"clbits={self.n_clbits}"]
+        string = "".join([x + delim for x in info])
+        lines = [string]
+        for inst in self.instructions:
+            string = inst.to_string()
+            lines.append(string)
+        return "\n".join(lines)
+
+    @classmethod
+    def from_string(cls, string, delim="; "):
+        lines = string.splitlines()
+        info = lines.pop(0)
+        qbits = int(get_info(info, "qubits", delim))
+        cbits = int(get_info(info, "clbits", delim))
+        self = cls(qbits, cbits)
+        for line in lines:
+            inst = Instruction.from_string(line, self.qubits, self.clbits, delim)
+            self.add_instruction(inst)
+        return self
+
+    def save(self, file, delim="; "):
+        ext = ".circ"
+        if not file.endswith(ext):
+            file += ext
+        with open(file, "w") as f:
+            f.write(self.to_string(delim))
+        return file
+
+    @classmethod
+    def load(cls, file, delim="; "):
+        ext = ".circ"
+        if not file.endswith(ext):
+            file += ext
+        with open(file, "r") as f:
+            string = f.read()
+        return cls.from_string(string, delim)
+
+    def add_qubit(self, idx=None, add_clbit=False):
+        if idx is None:
+            idx = self.n_qubits
+        new = Qubit(idx)
+        for q in self.qubits:
+            if q.index >= idx:
+                q.index += 1
+        self.qubits.insert(idx, new)
+        self.basis = Basis(self.n_qubits)
+        self.backend.set_qubits(self.qubits, self.basis)
+        if add_clbit:
+            self.add_clbit(idx)
+
+
+    def add_clbit(self, idx=None):
+        if idx is None:
+            idx = self.n_qubits
+        new = Clbit(idx)
+        for c in self.clbits:
+            if c.index >= idx:
+                c.index += 1
+        self.clbits.insert(idx, new)
 
     # =========================================================================
 
@@ -148,15 +222,6 @@ class Circuit:
 
     def show(self):
         pass
-
-    def to_string(self, delim="; "):
-        info = [f"qubits={self.n_qubits}", f"clbits={self.n_clbits}"]
-        string = "".join([x + delim for x in info])
-        lines = [string]
-        for inst in self.instructions:
-            string = inst.to_string()
-            lines.append(string)
-        return "\n".join(lines)
 
     # =========================================================================
 
@@ -284,7 +349,7 @@ class Circuit:
         data = np.zeros((shots, self.n_clbits))
         for i in range(shots):
             data[i] = self.run_shot(*args, **kwargs)
-        self.res = CircuitResult(data, self.basis.labels)
+        self.res = CircuitResult(data)
         return self.res
 
     def histogram(self):

@@ -74,6 +74,12 @@ def get_info(string, key, delim="; "):
     return re.search(pre + r'(.*?)' + delim, string).group(1)
 
 
+def get_bit(bit_list, idx):
+    for bit in bit_list:
+        if bit.index == idx:
+            return bit
+
+
 def histogram(data, normalize=True):
     n, n_bins = data.shape
     binvals = np.power(2, np.arange(n_bins))[::-1]

@@ -28,6 +28,10 @@ class ParameterMap:
         return len(self.indices)
 
     @property
+    def num_params(self):
+        return len(self.params)
+
+    @property
     def args(self):
         return [self.get(i) for i in range(self.n)]
 

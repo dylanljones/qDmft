@@ -9,7 +9,7 @@ version: 1.0
 import re
 import numpy as np
 from .params import ParameterMap
-from .utils import to_list
+from .utils import to_list, get_bit
 
 
 def str_to_list(s, dtype=int):
@@ -75,11 +75,11 @@ class Instruction:
     def _attr_str(self):
         parts = [self.name, f"ID: {self.idx}"]
         if self.n_qubits:
-            parts.append(f"qBits: {self.n_qubits}")
+            parts.append(f"qBits: {self.qu_indices}")
         if self.n_con:
-            parts.append(f"con: {self.n_con}")
+            parts.append(f"con: {self.con_indices}")
         if self.n_clbits:
-            parts.append(f"cBits: {self.n_clbits}")
+            parts.append(f"cBits: {self.cl_indices}")
         if self.arg is not None:
             parts.append(f"Args: {self.arg}")
         return ", ".join(parts)
@@ -100,6 +100,39 @@ class Instruction:
         for key, val in self.to_dict().items():
             string += f"{key}={val}{delim}"
         return string
+
+    @classmethod
+    def from_string(cls, string, qubit_list, clbit_list, delim="; "):
+        qubits, con, clbits = None, None, None
+        args = dict()
+        for arg in string.split(delim)[:-1]:
+            key, val = arg.split("=")
+            args.update({key: val})
+        name = args["name"]
+
+        qu_indices = str_to_list(args["qbits"], int)
+        if qu_indices is not None:
+            qubits = [get_bit(qubit_list, idx) for idx in qu_indices]
+
+        con_indices = str_to_list(args["con"], int)
+        if con_indices is not None:
+            con = [get_bit(qubit_list, idx) for idx in con_indices]
+
+        cl_indices = str_to_list(args["qbits"], int)
+        if cl_indices is not None:
+            clbits = [get_bit(clbit_list, idx) for idx in cl_indices]
+
+        arg = float(args["arg"]) if args["arg"] != "None" else None
+        argidx = int(args["argidx"]) if args["argidx"] != "None" else None
+        if argidx == cls.pmap.num_params:
+            arg = arg or 0
+            argidx = None
+        if name.lower() == "m":
+            inst = Measurement(name, qubits=qubits, clbits=clbits)
+        else:
+            inst = Gate(name, qubits, con=con, arg=arg, argidx=argidx)
+        return inst
+
 
 
 class Measurement(Instruction):

@@ -6,8 +6,4 @@ author: Dylan Jones
 project: qsim
 version: 0.1
 """
-from .utils import *
-from .gates import *
-from .instruction import *
-from .backends import StateVector
-from .circuit import Circuit
+from .core import *
