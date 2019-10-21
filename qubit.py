@@ -3,7 +3,7 @@
 Created on 18 Oct 2019
 author: Dylan Jones
 
-project: qDmft
+project: qsim
 version: 1.0
 """
 import numpy as np
