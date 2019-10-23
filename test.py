@@ -10,19 +10,18 @@ import re, os
 import numpy as np
 from qsim import QuRegister, Qubit, Circuit, Gate, kron
 from qsim.core.gates import X_GATE, cgate, rx_gate, single_gate, pauli
-from scitools import Plot
+from scitools import Plot, Colors
 
 
 def main():
-    v, t, n = 4, 6, 12
-    arg = v/2 * t/n
-
     c = Circuit(2)
     c.h(0)
-    c.h(0)
+    c.crx(0, 1, np.pi/3)
     c.m()
-    c.run(100)
-    c.show_histogram()
+    c.run(1000, verbose=True)
+
+    print(c.backend.last)
+    c.show_histogram(color=Colors.bblue, lc=Colors.bred)
 
 
 if __name__ == "__main__":
