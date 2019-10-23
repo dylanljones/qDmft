@@ -9,9 +9,9 @@ version: 0.1
 import os
 import numpy as np
 from scitools import Plot
-from qsim2 import kron, pauli
-from qsim2 import Circuit
-from qsim2.vqe import VqeSolver
+from qsim import kron, pauli
+from qsim import Circuit
+from qsim.vqe import VqeSolver
 
 si, sx, sy, sz = pauli
 

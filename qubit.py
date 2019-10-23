@@ -8,7 +8,7 @@ version: 1.0
 """
 import os
 import numpy as np
-from qsim2 import Circuit
+from qsim import Circuit
 
 FILE = "test2"
 

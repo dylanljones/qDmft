@@ -8,8 +8,8 @@ version: 0.1
 """
 import re, os
 import numpy as np
-from qsim2 import QuRegister, Qubit, Circuit, Gate, kron
-from qsim2.core.gates import X_GATE, cgate, rx_gate, single_gate, pauli
+from qsim import QuRegister, Qubit, Circuit, Gate, kron
+from qsim.core.gates import X_GATE, cgate, rx_gate, single_gate, pauli
 from scitools import Plot
 
 
