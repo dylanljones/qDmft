@@ -379,7 +379,10 @@ class Circuit:
             if verbose:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
         self.res = CircuitResult(data)
-        terminal.writeln()
+        if verbose:
+            terminal.writeln()
+            val, p = self.res.mean()
+            terminal.writeln(f"Result: {val} (p={p:.2f})")
         return self.res
 
     def histogram(self):

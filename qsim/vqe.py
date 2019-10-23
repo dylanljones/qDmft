@@ -10,7 +10,7 @@ import os
 import numpy as np
 import scipy.linalg as la
 from scipy import optimize
-from qsim.circuit import Circuit
+from .core import Circuit
 
 
 class VqeResult(optimize.OptimizeResult):

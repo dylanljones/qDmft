@@ -83,8 +83,8 @@ def main():
     c.append(time_evolution_circuit(arg, 1))
     c.m(0, 0)
     # c.print(False)
-    c.run(1000, verbose=True)
-    c.res.show_histogram()
+    res = c.run(1000, verbose=True)
+    res.show_histogram()
     # s.apply_gate(xy_gate(np.pi/3))
 
 
