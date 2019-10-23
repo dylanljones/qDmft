@@ -9,7 +9,7 @@ version: 0.1
 import os
 import numpy as np
 from scitools import Plot
-from qsim2 import kron, pauli, single_gate, cgate, X_GATE, rx_gate
+from qsim2 import kron, pauli
 from qsim2 import Circuit
 from qsim2.vqe import VqeSolver
 
@@ -27,7 +27,7 @@ def hamiltonian(u=4, v=1, eps_bath=2, mu=2):
 
 
 def vqe_circuit(depth=2):
-    c = Circuit(4)
+    c = Circuit(4, 1)
     c.h(0)
     for i in range(depth):
         c.cx(0, 1)
@@ -57,41 +57,35 @@ def optimize_circuit(new=False, depth=2, file=FILE):
     return vqe.circuit
 
 
-def xy_gate(arg):
-    notc = cgate(1, 0, X_GATE)
-    crx = cgate(0, 1, rx_gate(arg))
-    xy = np.dot(notc, crx.dot(notc))
-    return xy
-
-
-def add_xy_gate(c, q0, q1, arg):
-    c.cx(q1, q0)
-    c.crx(q0, q1, arg)
-    c.cx(q1, q0)
-
-
-def trotter_step(c, arg):
-    add_xy_gate(c, 0, 1, arg)
-    add_xy_gate(c, 2, 3, arg)
-
-
-
+def time_evolution_circuit(arg, step):
+    c = Circuit(5, 1)
+    c.h(0)
+    c.cx(0, 1)
+    for i in range(step):
+        c.xy(1, 2, arg)
+        c.xy(3, 4, arg)
+        c.b(1, 3, arg)
+    c.cx(0, 1)
+    c.h(0)
+    return c
 
 
 def main():
-    # c = optimize_circuit(True)
-    # c.add_qubit(0, add_clbit=True)
     tau = 6
     v = 4
     n = 2
     arg = v/2 * tau/n
-    c = Circuit(4)
-    trotter_step(c, arg)
-    c.print()
-    c.run()
-    # s.apply_gate(xy_gate(np.pi/3))
-    print(c.backend)
 
+    # c = Circuit(5, 1)
+    c = optimize_circuit()
+    c.add_qubit(0)
+
+    c.append(time_evolution_circuit(arg, 1))
+    c.m(0, 0)
+    # c.print(False)
+    c.run(1000, verbose=True)
+    c.res.show_histogram()
+    # s.apply_gate(xy_gate(np.pi/3))
 
 
 if __name__ == "__main__":

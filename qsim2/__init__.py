@@ -7,3 +7,6 @@ project: qsim
 version: 0.1
 """
 from .core import *
+from .core import visuals
+from .core import utils
+from .core import gates

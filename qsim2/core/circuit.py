@@ -6,9 +6,8 @@ author: Dylan Jones
 project: qsim
 version: 1.0
 """
-import re
 import numpy as np
-from scitools import Plot
+from scitools import Plot, Terminal
 from .register import Qubit, Clbit
 from .utils import Basis, get_info, to_list, histogram
 from .visuals import CircuitString
@@ -140,6 +139,17 @@ class Circuit:
     def set_param(self, idx, arg):
         self.pmap[idx] = arg
 
+    def __getitem__(self, item):
+        return self.instructions[item]
+
+    def __iter__(self):
+        for inst in self.instructions:
+            yield inst
+
+    def append(self, circuit):
+        for inst in circuit:
+            self.add(inst)
+
     # =========================================================================
 
     def to_string(self, delim="; "):
@@ -160,7 +170,7 @@ class Circuit:
         self = cls(qbits, cbits)
         for line in lines:
             inst = Instruction.from_string(line, self.qubits, self.clbits, delim)
-            self.add_instruction(inst)
+            self.add(inst)
         return self
 
     def save(self, file, delim="; "):
@@ -193,7 +203,6 @@ class Circuit:
         if add_clbit:
             self.add_clbit(idx)
 
-
     def add_clbit(self, idx=None):
         if idx is None:
             idx = self.n_qubits
@@ -202,6 +211,9 @@ class Circuit:
             if c.index >= idx:
                 c.index += 1
         self.clbits.insert(idx, new)
+
+    def add_custom_gate(self, name, item):
+        self.backend.add_custom_gate(name, item)
 
     # =========================================================================
 
@@ -214,10 +226,10 @@ class Circuit:
             string += "\n   " + str(inst)
         return string
 
-    def print(self, padding=1, maxwidth=None):
+    def print(self, show_args=True, padding=1, maxwidth=None):
         s = CircuitString(len(self.qubits), padding)
         for instructions in self.instructions:
-            s.add(instructions)
+            s.add(instructions, show_arg=show_args)
         print(s.build(wmax=maxwidth))
 
     def show(self):
@@ -225,7 +237,7 @@ class Circuit:
 
     # =========================================================================
 
-    def add_instruction(self, inst):
+    def add(self, inst):
         self.instructions.append(inst)
         return inst
 
@@ -249,17 +261,17 @@ class Circuit:
             bitlist.append(c)
         return bitlist
 
-    def add_gate(self, name, qubits, con=None, arg=None, argidx=None):
+    def add_gate(self, name, qubits, con=None, arg=None, argidx=None, n=1):
         qubits = self._get_qubits(qubits)
         con = self._get_qubits(con)
-        gates = Gate(name, qubits, con=con, arg=arg, argidx=argidx)
-        return self.add_instruction(gates)
+        gates = Gate(name, qubits, con=con, arg=arg, argidx=argidx, n=n)
+        return self.add(gates)
 
     def add_measurement(self, qubits, clbits):
         qubits = self._get_qubits(qubits)
         clbits = self._get_clbits(clbits)
         m = Measurement("m", qubits, clbits)
-        return self.add_instruction(m)
+        return self.add(m)
 
     def i(self, qubit):
         return self.add_gate("I", qubit)
@@ -318,6 +330,16 @@ class Circuit:
     def crz(self, con, qubit, arg=0, argidx=None):
         return self.add_gate("Rz", qubit, con, arg, argidx)
 
+    def xy(self, qubit1, qubit2, arg=0, argidx=None):
+        qubits = self._get_qubits([qubit1, qubit2])
+        gate = Gate("XY", qubits, arg=arg, argidx=argidx, n=2)
+        return self.add(gate)
+
+    def b(self, qubit1, qubit2, arg=0, argidx=None):
+        qubits = self._get_qubits([qubit1, qubit2])
+        gate = Gate("B", qubits, arg=arg, argidx=argidx, n=2)
+        return self.add(gate)
+
     def m(self, qubits=None, clbits=None):
         if qubits is None:
             qubits = range(self.n_qubits)
@@ -345,11 +367,19 @@ class Circuit:
                     data[idx] = x
         return data
 
-    def run(self, shots=1, *args, **kwargs):
+    def run(self, shots=1, verbose=False, *args, **kwargs):
+        terminal = Terminal()
+        header = "Running experiment"
+        if verbose:
+            terminal.write(header)
+
         data = np.zeros((shots, self.n_clbits))
         for i in range(shots):
             data[i] = self.run_shot(*args, **kwargs)
+            if verbose:
+                terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
         self.res = CircuitResult(data)
+        terminal.writeln()
         return self.res
 
     def histogram(self):

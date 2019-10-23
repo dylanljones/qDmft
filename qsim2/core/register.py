@@ -77,6 +77,9 @@ class Register:
         for bit in self.bits[index + 1:]:
             bit.index += 1
 
+    def __getitem__(self, item):
+        return self.bits[item]
+
     def __add__(self, other):
         if isinstance(other, self.bit_type):
             # other.index += self.n

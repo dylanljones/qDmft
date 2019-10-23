@@ -21,6 +21,9 @@ class Backend:
         self.n_qubits = 0
         self.set_qubits(qubits, basis)
 
+    def add_custom_gate(self, name, item):
+        pass
+
     def set_qubits(self, qubits, basis=None):
         self.qubits = qubits
         self.n_qubits = len(qubits)
@@ -44,6 +47,7 @@ class Backend:
 class StateVector(Backend):
 
     name = "statevector"
+    GATE_DICT = GATE_DICT
 
     def __init__(self, qubits, basis=None, amp=None):
         super().__init__(qubits, basis)
@@ -91,6 +95,9 @@ class StateVector(Backend):
         s = StateVector(self.qubits, self.basis, self.amp)
         self.snapshots.append(s)
 
+    def add_custom_gate(self, name, item):
+        self.GATE_DICT.update({name: item})
+
     def state(self):
         return self.amp
 
@@ -116,11 +123,18 @@ class StateVector(Backend):
         proj = kron(parts)
         return np.dot(proj, self.amp)
 
+    @classmethod
+    def _get_gatefunc(cls, name):
+        return cls.GATE_DICT.get(name.lower())
+
     def build_gate(self, gate):
         if gate.is_controlled:
             name = gate.name.replace("c", "")
-            gate_func = GATE_DICT.get(name.lower())
+            gate_func = self._get_gatefunc(name)
             arr = cgate(gate.con_indices, gate.qu_indices[0], gate_func(gate.arg), self.n_qubits)
+        elif gate.size > 1:
+            gate_func = self._get_gatefunc(gate.name)
+            arr = gate_func(gate.qu_indices, self.n_qubits, gate.arg)
         else:
             gate_func = GATE_DICT.get(gate.name.lower())
             arr = single_gate(gate.qu_indices, gate_func(gate.arg), self.n_qubits)

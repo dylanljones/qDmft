@@ -66,11 +66,6 @@ def rz_gate(phi=0):
     return np.array([[np.exp(-arg), 0], [0, np.exp(arg)]])
 
 
-GATE_DICT = {"i": id_gate, "x": x_gate, "y": y_gate, "z": z_gate,
-             "h": h_gate, "s": s_gate, "t": t_gate,
-             "rx": rx_gate, "ry": ry_gate, "rz": rz_gate}
-
-
 # =========================================================================
 
 def single_gate(qbits, gate, n):
@@ -148,3 +143,23 @@ def swap_single_cgate(gate):
     gate_tensor = np.swapaxes(gate_tensor, 0, 1)  # Switch qubit 1
     gate_tensor = np.swapaxes(gate_tensor, 2, 3)  # Switch qubit 2
     return gate_tensor.reshape((4, 4))            # reshape 2x2x2x2 tensor to 4x4 gate
+
+
+def xy_gatefunc(qubits, n, arg):
+    q1, q2 = qubits
+    notc = cgate(q2, q1, X_GATE, n)
+    crx = cgate(q1, q2, rx_gate(arg), n)
+    return np.dot(notc, crx.dot(notc))
+
+
+def b_gatefunc(qubits, n, arg):
+    sigma = single_gate(qubits, Z_GATE, n)
+    gate = np.cos(arg) * np.eye(2**n) + np.sin(arg) * sigma
+    return gate
+
+
+GATE_DICT = {"i": id_gate, "x": x_gate, "y": y_gate, "z": z_gate,
+             "h": h_gate, "s": s_gate, "t": t_gate,
+             "rx": rx_gate, "ry": ry_gate, "rz": rz_gate,
+             "xy": xy_gatefunc, "b": b_gatefunc
+             }

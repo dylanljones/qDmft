@@ -11,3 +11,4 @@ from .gates import *
 from .instruction import *
 from .backends import StateVector
 from .circuit import Circuit
+from .register import Qubit, Clbit, QuRegister, ClRegister

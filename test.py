@@ -8,9 +8,8 @@ version: 0.1
 """
 import re, os
 import numpy as np
-from qsim import Circuit, Gate
-from qsim.visuals import CircuitString
-from qsim.utils import *
+from qsim2 import QuRegister, Qubit, Circuit, Gate, kron
+from qsim2.core.gates import X_GATE, cgate, rx_gate, single_gate, pauli
 from scitools import Plot
 
 
@@ -28,50 +27,30 @@ def get_circuit(new=False, file="circuits/test.circ"):
         return Circuit.load(file)
 
 
-class Register(list):
-
-    INDEX = 0
-
-    def __init__(self, size):
-        self.idx = Register.INDEX
-        Register.INDEX += 1
-        super().__init__(range(size))
-
-    @property
-    def n(self):
-        return len(self)
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(idx: {self.idx}, size: {self.n})"
-
-
-class QuRegister(Register):
-
-    def __init__(self, size):
-        super().__init__(size)
-
-
-class ClRegister(Register):
-
-    def __init__(self, size, values=0):
-        super().__init__(size)
-        if not hasattr(values, "__len__"):
-            values = np.ones(size) * values
-        self.values = np.asarray(values)
-
-    @classmethod
-    def like(cls, register):
-        return cls(register.n)
-
-    def __str__(self):
-        return f"{self.__class__.__name__}(idx: {self.idx}, values: {self.values})"
+def time_evolution_circuit(arg, step):
+    c = Circuit(5, 1)
+    c.h(0)
+    c.cx(0, 1)
+    for i in range(step):
+        c.xy(1, 2, arg)
+        c.xy(3, 4, arg)
+        c.b(1, 3, arg)
+    c.cx(0, 1)
+    c.h(0)
+    c.m(0, 0)
+    return c
 
 
 def main():
-    qreg = QuRegister(3)
-    creg = ClRegister.like(qreg)
-    print(qreg)
-    print(creg)
+    v, t, n = 4, 6, 12
+    arg = v/2 * t/n
+
+    c = Circuit(2)
+    c.h(0)
+    c.h(0)
+    c.m()
+    c.run(100)
+    c.show_histogram()
 
 
 if __name__ == "__main__":

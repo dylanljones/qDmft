@@ -27,7 +27,7 @@ class Instruction:
     def __init__(self, name, qubits=None, con=None, clbits=None, n=1, arg=None, argidx=None):
         self.idx = Instruction.INDEX
         Instruction.INDEX += 1
-        self.size = 1
+        self.size = n
         self.name = name
 
         self.qubits = to_list(qubits) if qubits is not None else None
@@ -66,7 +66,7 @@ class Instruction:
 
     @property
     def argidx(self):
-        return self.pmap.indices[self.idx] #.index(self.idx)
+        return self.pmap.indices[self.idx]
 
     @property
     def arg(self):
@@ -134,7 +134,6 @@ class Instruction:
         return inst
 
 
-
 class Measurement(Instruction):
 
     TYPE = "Measurement"
@@ -149,8 +148,8 @@ class Gate(Instruction):
 
     TYPE = "Gate"
 
-    def __init__(self, name, qubits, con=None, arg=None, argidx=None):
-        super().__init__(name, qubits, con=con, arg=arg, argidx=argidx)
+    def __init__(self, name, qubits, con=None, arg=None, argidx=None, n=1):
+        super().__init__(name, qubits, con=con, n=n, arg=arg, argidx=argidx)
         if con is not None:
             self.name = "c" * len(self.con) + self.name
 
@@ -189,3 +188,7 @@ class Gate(Instruction):
     @classmethod
     def rz(cls, qubit, arg=0, argidx=None, con=None):
         return cls("Rz", qubit, con, arg, argidx)
+
+    @classmethod
+    def xy(cls, qubit1, qubit2, arg=0, argidx=None):
+        return cls("XY", [qubit1, qubit2], arg=arg, argidx=argidx, n=2)

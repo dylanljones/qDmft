@@ -182,15 +182,11 @@ class CircuitString(Visualizer):
         r0, r1 = outer_indices(indices, indices)
         inner = inner_indices(self.n, indices, indices)
         if r0 == r1:
-            # self._add_to_row(r0, centered(edge, name, edge, pad))
             self.layer[r0] = centered(edge, name, edge, pad)
         else:
-            # self._add_to_row(r0, centered(edge, name, space, pad))
-            # self._add_to_row(r1, centered(space, space, edge, pad))
             self.layer[r0] = centered(edge, name, space, pad)
             self.layer[r1] = centered(space, space, edge, pad)
             for i, row in enumerate(inner):
-                # self._add_to_row(row, centered(space, space if row in indices else line, space, pad))
                 self.layer[row] = centered(space, space if row in indices else line, space, pad)
         self.widths[-1] = max(width, self.widths[-1])
 
@@ -221,7 +217,7 @@ class CircuitString(Visualizer):
         for q, c in zip(qbits, cbits):
             self.add_gate(q, f"M {c}")
 
-    def add(self, inst, padding=0):
+    def add(self, inst, padding=0, show_arg=True):
         self.next_layer()
         if inst.name.lower() == "m":
             self.add_measurement(inst.qu_indices, inst.cl_indices)
@@ -229,10 +225,13 @@ class CircuitString(Visualizer):
             self.add_control_gate(inst, padding)
         else:
             name = inst.name
-            if inst.arg is not None:
+            if show_arg and inst.arg is not None:
                 name += f" ({inst.arg:.1f})"
-            for q in inst.qubits:
-                self.add_gate([q.index], name, padding)
+            if inst.size == len(inst.qubits):
+                self.add_gate(inst.qu_indices, name, padding)
+            else:
+                for q in inst.qubits:
+                    self.add_gate([q.index], name, padding)
 
     def add_end(self, width=2):
         self.next_layer()
