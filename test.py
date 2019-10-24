@@ -8,21 +8,20 @@ version: 0.1
 """
 import re, os
 import numpy as np
-from qsim import QuRegister, Qubit, Circuit, Gate, kron
+import itertools
+from qsim import QuRegister, Qubit, StateVector, Circuit, Gate, kron
 from qsim.core.gates import X_GATE, cgate, rx_gate, single_gate, pauli
 from scitools import Plot
 
 
 def main():
-    v, t, n = 4, 6, 12
-    arg = v/2 * t/n
+    reg = QuRegister(2)
 
-    c = Circuit(2)
-    c.h(0)
-    c.h(0)
-    c.m()
-    c.run(100)
-    c.show_histogram()
+    x = Gate.x(reg[0])
+
+    s = StateVector(reg.bits)
+    s.apply_gate(x)
+    print(s)
 
 
 if __name__ == "__main__":

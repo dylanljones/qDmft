@@ -7,7 +7,6 @@ project: qsim
 version: 1.0
 """
 import re
-import numpy as np
 from .params import ParameterMap
 from .utils import to_list, get_bit
 

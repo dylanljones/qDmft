@@ -7,6 +7,7 @@ project: qsim
 version: 1.0
 """
 import numpy as np
+import itertools
 
 
 class Bit:
@@ -53,21 +54,29 @@ class Clbit(Bit):
 
 
 class Register:
-
-    INDEX = 0
+    _id_iter = itertools.count()
     bit_type = None
 
     def __init__(self, size=0):
-        self.idx = Register.INDEX
-        Register.INDEX += 1
+        self.idx = next(self._id_iter)
         self.bits = [self.bit_type(i, self) for i in range(size)]
 
     @property
     def n(self):
         return len(self.bits)
 
+    @property
+    def indices(self):
+        return [bit.index for bit in self.bits]
+
     def __repr__(self):
         return f"{self.__class__.__name__}({self.idx}, size: {self.n})"
+
+    def __getitem__(self, item):
+        if hasattr(item, "__len__"):
+            return [self.bits[i] for i in item]
+        else:
+            return self.bits[item]
 
     def insert(self, bit, index=None):
         index = self.n if index is None else index
@@ -77,42 +86,8 @@ class Register:
         for bit in self.bits[index + 1:]:
             bit.index += 1
 
-    def __getitem__(self, item):
+    def index(self, item):
         return self.bits[item]
-
-    def __add__(self, other):
-        if isinstance(other, self.bit_type):
-            # other.index += self.n
-            other.register = self
-            self.bits.append(other)
-        elif isinstance(other, self.__class__):
-            print("Reg")
-            for bit in other.bits:
-                # bit.index += self.n
-                bit.register = self
-                self.bits.append(bit)
-        return self
-
-    def __radd__(self, other):
-        if isinstance(other, self.bit_type):
-            # other.index += self.n
-            other.register = self
-            self.bits.append(other)
-        elif isinstance(other, self.__class__):
-            print("Reg")
-            for bit in other.bits:
-                # bit.index += self.n
-                bit.register = self
-                self.bits.append(bit)
-        return self
-
-
-class QuRegister(Register):
-
-    bit_type = Qubit
-
-    def __init__(self, size=0):
-        super().__init__(size)
 
 
 class ClRegister(Register):
@@ -128,3 +103,17 @@ class ClRegister(Register):
     @classmethod
     def like(cls, register):
         return cls(register.n)
+
+
+class QuRegister(Register):
+
+    bit_type = Qubit
+
+    def __init__(self, size=0):
+        super().__init__(size)
+
+    def __str__(self):
+        string = ""
+
+
+

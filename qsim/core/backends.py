@@ -6,7 +6,6 @@ author: Dylan Jones
 project: qsim
 version: 1.0
 """
-import numpy as np
 import scipy.linalg as la
 from .visuals import AmplitudePlot
 from .utils import ZERO, Basis, to_array
@@ -125,7 +124,10 @@ class StateVector(Backend):
 
     @classmethod
     def _get_gatefunc(cls, name):
-        return cls.GATE_DICT.get(name.lower())
+        func = cls.GATE_DICT.get(name.lower())
+        if func is None:
+            raise KeyError(f"Gate-function \'{name}\' not in dictionary")
+        return func
 
     def build_gate(self, gate):
         if gate.is_controlled:
@@ -136,7 +138,7 @@ class StateVector(Backend):
             gate_func = self._get_gatefunc(gate.name)
             arr = gate_func(gate.qu_indices, self.n_qubits, gate.arg)
         else:
-            gate_func = GATE_DICT.get(gate.name.lower())
+            gate_func = self._get_gatefunc(gate.name)
             arr = single_gate(gate.qu_indices, gate_func(gate.arg), self.n_qubits)
         return arr
 

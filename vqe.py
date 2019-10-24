@@ -56,7 +56,6 @@ def get_opt_circuit(new=False, depth=2, file=FILE):
     return vqe.circuit
 
 
-
 def main():
     c = get_opt_circuit(True)
     

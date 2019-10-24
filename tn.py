@@ -8,19 +8,9 @@ version: 0.1
 """
 import numpy as np
 import scipy.linalg as la
+from scipy import sparse
 from scitools import Plot
-from qsim import StateVector, STATES
-from qsim.gates import *
-
-
-def show_measurement_hist(tensor, idx, n=1000):
-    results = np.zeros(n)
-    for i in range(n):
-        val, p = measure_tensor(tensor, idx)
-        results[i] = val
-    plot = Plot()
-    plot.histogram(results)
-    plot.show()
+from qsim import QuRegister, StateVector
 
 
 def measure_tensor(tensor, idx, decimals=10):
@@ -32,6 +22,21 @@ def measure_tensor(tensor, idx, decimals=10):
     probs = np.round(probs, decimals)
     res = np.random.choice([0, 1], p=probs)
     return res, probs[res]
+
+
+def old():
+    s = StateVector(2)
+    print(s)
+
+    tensor = s.tensor()
+    print(tensor)
+    s.from_tensor(tensor)
+    print(s)
+
+    cnot = cnot_gate()
+    # res = np.einsum("i,j,k, ijkl", q1, q2, q3, cnot)
+    # s.from_tensor(res)
+    print(s)
 
 
 def cnot_gate():
@@ -52,41 +57,40 @@ def notc_gate():
     return gate
 
 
-def initialize_qubits(arg):
-    if isinstance(arg, int):
-        qubits = [Qubit(0)] * arg
-    else:
-        qubits = [Qubit(x) for x in arg]
-    return qubits
+class SparseArray:
 
+    def __init__(self, shape):
+        self.shape = shape
+        self.elements = dict()
 
-class Qubit(np.ndarray):
+    def add(self, item, value):
+        self.elements.update({item: value})
 
-    def __new__(cls, arg, dtype=None):
-        if isinstance(arg, int):
-            arg = str(arg)
-        if isinstance(arg, str):
-            arg = STATES[arg]
-        return np.asarray(arg, dtype).view(cls)
+    def todense(self):
+        array = np.zeros(self.shape)
+        for idx, value in self.elements.items():
+            array[idx] = value
+        return array
 
 
 def main():
-    qubits = initialize_qubits("100")
-    q1, q2, q3 = qubits
+    reg = QuRegister(2)
+    # t = cnot_gate()
+    indices = np.array([[0, 0, 0, 0],
+                        [0, 1, 0, 1],
+                        [1, 0, 1, 1],
+                        [1, 1, 1, 0]])
+    data = np.ones(4)
 
-    state = kron(qubits)
-    s = StateVector(state)
-    print(s)
+    t = sparse.coo_matrix((data, *indices.T), shape=(2, 2, 2, 2))
+    print(t.toarray())
 
-    tensor = s.tensor()
-    print(tensor)
-    s.from_tensor(tensor)
-    print(s)
 
-    cnot = cnot_gate()
-    res = np.einsum("i,j,k, ijkl", q1, q2, q3, cnot)
-    s.from_tensor(res)
-    print(s)
+    # s = StateVector(reg.bits)
+    # print(t.reshape((4, 4)))
+
+
+
 
 
 

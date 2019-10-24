@@ -8,7 +8,6 @@ version: 0.1
 """
 import re
 import numpy as np
-from scitools import Plot, Circle
 
 # Initial states
 ZERO = np.array([1, 0])
