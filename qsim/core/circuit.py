@@ -57,16 +57,28 @@ class CircuitResult:
         pmax = res_sorted[0][1]
         return [(self.labels[i], p) for i, p in res_sorted if p >= thresh * pmax]
 
-    def show_histogram(self, show=True):
+    def show_histogram(self, show=True, print_values=True, max_line=True, padding=0.2,
+                       color=None, alpha=0.9, lc="r", lw=1, text_padding=0, scale=False):
         bins, hist = self.hist
-        plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1))
+        plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1.1))
         plot.set_title(f"N={self.n}")
         plot.grid(axis="y")
         plot.set_ticks(bins, np.arange(0, 1.1, 0.2))
         plot.set_ticklabels(self.labels)
-        plot.ax.bar(bins, hist, width=0.9)
+        plot.ax.bar(bins, hist, width=1-padding, color=color, alpha=0.9)
+
+        ymax = np.max(hist)
+        if print_values:
+            ypos = ymax + text_padding + 0.02
+            for x, y in zip(bins, hist):
+                if y:
+                    plot.text((x, ypos), f"{y:.2f}", ha="center", va="center")
+        if max_line:
+            plot.draw_lines(y=ymax, color=lc, lw=lw)
+
         if show:
             plot.show()
+        return plot
 
     def __str__(self):
         entries = [f"   {label} {p:.3f}" for label, p in self.highest()]
@@ -388,5 +400,5 @@ class Circuit:
     def histogram(self):
         return self.res.hist
 
-    def show_histogram(self, show=True):
-        return self.res.show_histogram(show)
+    def show_histogram(self, show=True, *args, **kwargs):
+        return self.res.show_histogram(show, *args, **kwargs)

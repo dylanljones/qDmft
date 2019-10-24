@@ -67,6 +67,10 @@ class StateVector(Backend):
     def norm(self):
         return la.norm(self.amp)
 
+    @property
+    def last(self):
+        return self.snapshots[-1]
+
     def __getitem__(self, item):
         return self.amp[item]
 
