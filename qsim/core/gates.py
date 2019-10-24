@@ -20,8 +20,6 @@ HADAMARD_GATE = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
 PHASE_GATE = np.array([[1, 0], [0, 1j]])
 T_GATE = np.array([[1, 0], [0, np.exp(1j*np.pi/4)]])
 
-pauli = np.eye(2), X_GATE, Y_GATE, Z_GATE
-
 
 def id_gate(args):
     return pauli[0]

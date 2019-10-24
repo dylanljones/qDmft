@@ -59,20 +59,22 @@ class CircuitResult:
 
     def show_histogram(self, show=True, print_values=True, max_line=True, padding=0.2,
                        color=None, alpha=0.9, lc="r", lw=1, text_padding=0, scale=False):
+
         bins, hist = self.hist
-        plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1.1))
-        plot.set_title(f"N={self.n}")
+        plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1.1), title=f"N={self.n}")
         plot.grid(axis="y")
         plot.set_ticks(bins, np.arange(0, 1.1, 0.2))
         plot.set_ticklabels(self.labels)
-        plot.ax.bar(bins, hist, width=1-padding, color=color, alpha=0.9)
+        # plot.draw_lines(y=1, color="0.5")
+        plot.bar(bins, hist, width=1-padding, color=color, alpha=0.9)
 
         ymax = np.max(hist)
         if print_values:
             ypos = ymax + text_padding + 0.02
             for x, y in zip(bins, hist):
+                col = "0.5" if y != ymax else "0.0"
                 if y:
-                    plot.text((x, ypos), f"{y:.2f}", ha="center", va="center")
+                    plot.text((x, ypos), s=f"{y:.2f}", ha="center", va="center", color=col)
         if max_line:
             plot.draw_lines(y=ymax, color=lc, lw=lw)
 

@@ -7,7 +7,6 @@ project: qsim
 version: 1.0
 """
 import scipy.linalg as la
-from .visuals import AmplitudePlot
 from .utils import ZERO, Basis, to_array
 from .gates import *
 
@@ -86,14 +85,6 @@ class StateVector(Backend):
         strings.insert(0, head)
         return "\n".join(strings) + "\n"
 
-    def show_amplitudes(self, show=True):
-        amps = self.amplitudes()
-        plot = AmplitudePlot(self.n_qubits)
-        plot.set_amps(amps)
-        if show:
-            plot.show()
-        return plot
-
     def save_snapshot(self):
         s = StateVector(self.qubits, self.basis, self.amp)
         self.snapshots.append(s)
@@ -118,6 +109,9 @@ class StateVector(Backend):
 
     def probabilities(self, decimals=10):
         return np.abs(self.amplitudes(decimals))**2
+
+    def get_projected(self, projection):
+        return np.dot(projection, self.amp)
 
     def project(self, idx, val):
         proj = P0 if val == 0 else P1
@@ -151,7 +145,7 @@ class StateVector(Backend):
             gate = self.build_gate(gate)
         self.amp = np.dot(gate, self.amp)
 
-    def _measure_qubit(self, qubit):
+    def _measure_qubit(self, qubit, shadow=False):
         idx = qubit.index
         # Simulate measurement of qubit q
         projected = self.project(idx, 0)
@@ -160,10 +154,11 @@ class StateVector(Backend):
         if value == 1:
             projected = self.project(idx, 1)
         # Project other qubits and normalize
-        self.amp = projected / la.norm(projected)
+        if not shadow:
+            self.amp = projected / la.norm(projected)
         return value
 
-    def measure(self, qbits, snapshot=True):
+    def measure(self, qbits, snapshot=True, shadow=False):
         if snapshot:
             self.save_snapshot()
-        return [self._measure_qubit(q) for q in to_array(qbits)]
+        return [self._measure_qubit(q, shadow) for q in to_array(qbits)]
