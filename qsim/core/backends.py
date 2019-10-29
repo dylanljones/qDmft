@@ -8,6 +8,7 @@ version: 1.0
 """
 import scipy.linalg as la
 from .utils import ZERO, Basis, to_array
+from .register import Qubit, QuRegister
 from .gates import *
 
 
@@ -23,6 +24,8 @@ class Backend:
         pass
 
     def set_qubits(self, qubits, basis=None):
+        if isinstance(qubits, QuRegister):
+            qubits = qubits.bits
         self.qubits = qubits
         self.n_qubits = len(qubits)
         self.basis = basis or Basis(len(qubits))
