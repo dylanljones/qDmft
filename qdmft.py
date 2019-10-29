@@ -10,7 +10,7 @@ import os
 import numpy as np
 from scitools import Plot
 from qsim import kron, pauli
-from qsim import Circuit
+from qsim import Circuit, Z_GATE, X_GATE, Y_GATE
 from qsim.vqe import VqeSolver
 
 VQE_FILE = "circuits/twosite_vqe"
@@ -29,21 +29,30 @@ def time_evolution_circuit(arg, step):
     return c
 
 
+def get_twosite_circuit(arg, step):
+    c = Circuit.load(VQE_FILE)
+    c.add_qubit(0)
+    c.append(time_evolution_circuit(arg, step))
+    return c
+
+
 def main():
     tau = 6
     v = 4
-    n = 2
+    n = 20
     arg = v/2 * tau/n
 
-    c = Circuit.load(VQE_FILE)
-    c.add_qubit(0)
+    values = np.zeros(n, "complex")
+    for i in range(n):
+        c = get_twosite_circuit(arg, i)
+        c.run()
+        values[i] = c.backend.expectation(Y_GATE, 0)
 
-    c.append(time_evolution_circuit(arg, 1))
-    c.m(0, 0)
-    c.print(False)
-    res = c.run(100, verbose=True)
-    print(c.backend.last)
-    res.show_histogram()
+    plot = Plot()
+    plot.plot(values.real)
+    plot.plot(values.imag)
+    plot.show()
+
     # s.apply_gate(xy_gate(np.pi/3))
 
 

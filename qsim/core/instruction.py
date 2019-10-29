@@ -9,6 +9,7 @@ version: 1.0
 import re
 from .params import ParameterMap
 from .utils import to_list, get_bit
+from .gates import GATE_DICT, cgate, single_gate
 
 
 def str_to_list(s, dtype=int):
@@ -146,6 +147,7 @@ class Measurement(Instruction):
 class Gate(Instruction):
 
     TYPE = "Gate"
+    GATE_DICT = GATE_DICT
 
     def __init__(self, name, qubits, con=None, arg=None, argidx=None, n=1):
         super().__init__(name, qubits, con=con, n=n, arg=arg, argidx=argidx)
@@ -191,3 +193,27 @@ class Gate(Instruction):
     @classmethod
     def xy(cls, qubit1, qubit2, arg=0, argidx=None):
         return cls("XY", [qubit1, qubit2], arg=arg, argidx=argidx, n=2)
+
+    @classmethod
+    def add_custom_gate(cls, name, item):
+        cls.GATE_DICT.update({name: item})
+
+    @classmethod
+    def _get_gatefunc(cls, name):
+        func = cls.GATE_DICT.get(name.lower())
+        if func is None:
+            raise KeyError(f"Gate-function \'{name}\' not in dictionary")
+        return func
+
+    def build_matrix(self, n_qubits):
+        if self.is_controlled:
+            name = self.name.replace("c", "")
+            gate_func = self._get_gatefunc(name)
+            arr = cgate(self.con_indices, self.qu_indices[0], gate_func(self.arg), n_qubits)
+        elif self.size > 1:
+            gate_func = self._get_gatefunc(self.name)
+            arr = gate_func(self.qu_indices, n_qubits, self.arg)
+        else:
+            gate_func = self._get_gatefunc(self.name)
+            arr = single_gate(self.qu_indices, gate_func(self.arg), n_qubits)
+        return arr

@@ -17,6 +17,7 @@ si, sx, sy, sz = pauli
 
 FILE = "test_vqe"
 
+
 def hamiltonian(u=4, v=1, eps_bath=2, mu=2):
     h1 = u / 2 * (kron(sz, si, sz, si) - kron(sz, si, si, si) - kron(si, si, sz, si))
     h2 = mu * (kron(sz, si, si, si) + kron(si, si, sz, si))
@@ -57,9 +58,8 @@ def get_opt_circuit(new=False, depth=2, file=FILE):
 
 
 def main():
-    c = get_opt_circuit(True)
-    
-    c.add_qubit(0)
+    c = get_opt_circuit()
+    # c.add_qubit(0)
     c.print()
 
 

@@ -113,12 +113,19 @@ class StateVector(Backend):
     def get_projected(self, projection):
         return np.dot(projection, self.amp)
 
-    def project(self, idx, val):
-        proj = P0 if val == 0 else P1
+    def build_operator(self, idx, op):
         parts = [np.eye(2)] * self.n_qubits
-        parts[idx] = proj
-        proj = kron(parts)
-        return np.dot(proj, self.amp)
+        parts[idx] = op
+        return kron(parts)
+
+    def project(self, idx, op):
+        proj = self.build_operator(idx, op)
+        return self.get_projected(proj)
+
+    def expectation(self, op, idx=None):
+        if idx is not None:
+            op = self.build_operator(idx, op)
+        return np.dot(self.amp, op.dot(self.amp))
 
     @classmethod
     def _get_gatefunc(cls, name):
@@ -127,32 +134,32 @@ class StateVector(Backend):
             raise KeyError(f"Gate-function \'{name}\' not in dictionary")
         return func
 
-    def build_gate(self, gate):
-        if gate.is_controlled:
-            name = gate.name.replace("c", "")
-            gate_func = self._get_gatefunc(name)
-            arr = cgate(gate.con_indices, gate.qu_indices[0], gate_func(gate.arg), self.n_qubits)
-        elif gate.size > 1:
-            gate_func = self._get_gatefunc(gate.name)
-            arr = gate_func(gate.qu_indices, self.n_qubits, gate.arg)
-        else:
-            gate_func = self._get_gatefunc(gate.name)
-            arr = single_gate(gate.qu_indices, gate_func(gate.arg), self.n_qubits)
-        return arr
+    # def build_gate(self, gate):
+    #     if gate.is_controlled:
+    #         name = gate.name.replace("c", "")
+    #         gate_func = self._get_gatefunc(name)
+    #         arr = cgate(gate.con_indices, gate.qu_indices[0], gate_func(gate.arg), self.n_qubits)
+    #     elif gate.size > 1:
+    #         gate_func = self._get_gatefunc(gate.name)
+    #         arr = gate_func(gate.qu_indices, self.n_qubits, gate.arg)
+    #     else:
+    #         gate_func = self._get_gatefunc(gate.name)
+    #         arr = single_gate(gate.qu_indices, gate_func(gate.arg), self.n_qubits)
+    #     return arr
 
     def apply_gate(self, gate, *args, **kwargs):
         if not isinstance(gate, np.ndarray):
-            gate = self.build_gate(gate)
+            gate = gate.build_matrix(self.n_qubits)  # self.build_gate(gate)
         self.amp = np.dot(gate, self.amp)
 
     def _measure_qubit(self, qubit, shadow=False):
         idx = qubit.index
         # Simulate measurement of qubit q
-        projected = self.project(idx, 0)
+        projected = self.project(idx, P0)
         p0 = np.sum(np.abs(projected) ** 2)
         value = int(np.random.random() > p0)
         if value == 1:
-            projected = self.project(idx, 1)
+            projected = self.project(idx, P1)
         # Project other qubits and normalize
         if not shadow:
             self.amp = projected / la.norm(projected)
@@ -162,3 +169,10 @@ class StateVector(Backend):
         if snapshot:
             self.save_snapshot()
         return [self._measure_qubit(q, shadow) for q in to_array(qbits)]
+
+    def histogram(self):
+        return np.arange(self.n), np.abs(self.amp)
+
+    def measure2(self, qbit, op=Z_GATE):
+        x = np.dot(self.amp, self.project(qbit, op))
+        print(x)

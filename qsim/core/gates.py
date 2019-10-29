@@ -22,7 +22,7 @@ T_GATE = np.array([[1, 0], [0, np.exp(1j*np.pi/4)]])
 
 
 def id_gate(args):
-    return pauli[0]
+    return np.eye(2)
 
 
 def x_gate(args):

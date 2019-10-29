@@ -8,7 +8,7 @@ version: 1.0
 """
 import numpy as np
 from scitools import Plot, Terminal
-from .register import Qubit, Clbit
+from .register import Qubit, Clbit, QuRegister
 from .utils import Basis, get_info, to_list, histogram
 from .visuals import CircuitString
 from .instruction import Gate, Measurement, Instruction, ParameterMap
@@ -59,7 +59,6 @@ class CircuitResult:
 
     def show_histogram(self, show=True, print_values=True, max_line=True, padding=0.2,
                        color=None, alpha=0.9, lc="r", lw=1, text_padding=0, scale=False):
-
         bins, hist = self.hist
         plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1.1), title=f"N={self.n}")
         plot.grid(axis="y")
@@ -227,7 +226,7 @@ class Circuit:
         self.clbits.insert(idx, new)
 
     def add_custom_gate(self, name, item):
-        self.backend.add_custom_gate(name, item)
+        Gate.add_custom_gate(name, item)
 
     # =========================================================================
 
@@ -276,6 +275,8 @@ class Circuit:
         return bitlist
 
     def add_gate(self, name, qubits, con=None, arg=None, argidx=None, n=1):
+        if qubits is None:
+            qubits = self.qubits
         qubits = self._get_qubits(qubits)
         con = self._get_qubits(con)
         gates = Gate(name, qubits, con=con, arg=arg, argidx=argidx, n=n)
@@ -287,34 +288,34 @@ class Circuit:
         m = Measurement("m", qubits, clbits)
         return self.add(m)
 
-    def i(self, qubit):
+    def i(self, qubit=None):
         return self.add_gate("I", qubit)
 
-    def x(self, qubit):
+    def x(self, qubit=None):
         return self.add_gate("X", qubit)
 
-    def y(self, qubit):
+    def y(self, qubit=None):
         return self.add_gate("Y", qubit)
 
-    def z(self, qubit):
+    def z(self, qubit=None):
         return self.add_gate("Z", qubit)
 
-    def h(self, qubit):
+    def h(self, qubit=None):
         return self.add_gate("H", qubit)
 
-    def s(self, qubit):
+    def s(self, qubit=None):
         return self.add_gate("S", qubit)
 
-    def t(self, qubit):
+    def t(self, qubit=None):
         return self.add_gate("T", qubit)
 
-    def rx(self, qubit, arg=0, argidx=None):
+    def rx(self, qubit, arg=np.pi/2, argidx=None):
         return self.add_gate("Rx", qubit, arg=arg, argidx=argidx)
 
-    def ry(self, qubit, arg=0, argidx=None):
+    def ry(self, qubit, arg=np.pi/2, argidx=None):
         return self.add_gate("Ry", qubit, arg=arg, argidx=argidx)
 
-    def rz(self, qubit, arg=0, argidx=None):
+    def rz(self, qubit, arg=np.pi/2, argidx=None):
         return self.add_gate("Rz", qubit, arg=arg, argidx=argidx)
 
     def cx(self, con, qubit):
@@ -335,13 +336,13 @@ class Circuit:
     def ct(self, con, qubit):
         return self.add_gate("T", qubit, con)
 
-    def crx(self, con, qubit, arg=0, argidx=None):
+    def crx(self, con, qubit, arg=np.pi/2, argidx=None):
         return self.add_gate("Rx", qubit, con, arg, argidx)
 
-    def cry(self, con, qubit, arg=0, argidx=None):
+    def cry(self, con, qubit, arg=np.pi/2, argidx=None):
         return self.add_gate("Ry", qubit, con, arg, argidx)
 
-    def crz(self, con, qubit, arg=0, argidx=None):
+    def crz(self, con, qubit, arg=np.pi/2, argidx=None):
         return self.add_gate("Rz", qubit, con, arg, argidx)
 
     def xy(self, qubit1, qubit2, arg=0, argidx=None):
