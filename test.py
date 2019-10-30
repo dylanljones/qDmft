@@ -8,27 +8,39 @@ version: 0.1
 """
 import re, os
 import numpy as np
+import scipy.linalg as la
 import itertools
+from scitools import Matrix
 from qsim import *
 
 si, sx, sy, sz = pauli
 
 
-arg = kron(sx, sx)
-print(arg.real)
-print(arg.real * arg.real)
-print(arg.real * arg.real * arg.real)
+def time_evolution_operator(ham, t):
+    return np.exp(-1j * ham * t)
 
 
-arg = kron(sy, sy)
-print(arg.real)
-print(arg.real * arg.real)
-print(arg.real * arg.real * arg.real)
+
+
+
 
 
 def main():
-    reg = QuRegister(2)
-    s = StateVector(reg)
+    ham = np.zeros((3, 3))
+    ham[2, 1] = 1
+    ham[1, 2] = 1
+    print(ham)
+    eigvals, eigvecs = la.eig(ham)
+    eigvecs = eigvecs.T
+    for i in range(3):
+        ev, v = eigvals[i], eigvecs[i]
+        print(np.all(np.dot(ham, v) == ev * v))
+        print(f"{ev.real:<4} {v}")
+
+
+
+
+
 
 
 
