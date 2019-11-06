@@ -41,6 +41,24 @@ def kron(*args):
     return x
 
 
+def expectation(op, v):
+    return np.dot(v, op.dot(v))
+
+
+def basis_states(n):
+    return list(range(int(n)))
+
+
+def binstr(x, n=None):
+    string = bin(x)[2:]
+    n = n or len(string)
+    return f"{string:0>{n}}"
+
+
+def basis_strings(n):
+    return [f"|{binstr(x, n)}>" for x in range(2 ** n)]
+
+
 def to_array(x, *args, **kwargs):
     if not hasattr(x, "__len__"):
         x = [x]
@@ -58,20 +76,6 @@ def str_to_list(string, dtype=int):
         return None
     string = string.replace("[").replace("]")
     return [dtype(x) for x in string.split(" ")]
-
-
-def basis_states(n):
-    return list(range(int(n)))
-
-
-def binstr(x, n=None):
-    string = bin(x)[2:]
-    n = n or len(string)
-    return f"{string:0>{n}}"
-
-
-def basis_strings(n):
-    return [f"|{binstr(x, n)}>" for x in range(2 ** n)]
 
 
 def get_info(string, key, delim="; "):

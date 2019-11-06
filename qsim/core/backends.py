@@ -137,19 +137,6 @@ class StateVector(Backend):
             raise KeyError(f"Gate-function \'{name}\' not in dictionary")
         return func
 
-    # def build_gate(self, gate):
-    #     if gate.is_controlled:
-    #         name = gate.name.replace("c", "")
-    #         gate_func = self._get_gatefunc(name)
-    #         arr = cgate(gate.con_indices, gate.qu_indices[0], gate_func(gate.arg), self.n_qubits)
-    #     elif gate.size > 1:
-    #         gate_func = self._get_gatefunc(gate.name)
-    #         arr = gate_func(gate.qu_indices, self.n_qubits, gate.arg)
-    #     else:
-    #         gate_func = self._get_gatefunc(gate.name)
-    #         arr = single_gate(gate.qu_indices, gate_func(gate.arg), self.n_qubits)
-    #     return arr
-
     def apply_gate(self, gate, *args, **kwargs):
         if not isinstance(gate, np.ndarray):
             gate = gate.build_matrix(self.n_qubits)  # self.build_gate(gate)

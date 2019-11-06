@@ -8,6 +8,7 @@ version: 1.0
 """
 import numpy as np
 import itertools
+from .utils import to_list
 
 
 class Bit:
@@ -53,13 +54,29 @@ class Clbit(Bit):
         return f"Clbit: index={self.index}, reg={reg}"
 
 
+
+def init_bits(arg, bit_type, reg=None):
+    bits = None
+    if isinstance(arg, int):
+        bits = [bit_type(i, reg) for i in range(arg)]
+    elif isinstance(arg, bit_type):
+        arg.register = reg
+        bits = [arg]
+    elif isinstance(arg, list):
+        bits = arg
+        for b in bits:
+            b.register = reg
+    return bits
+
+
+
 class Register:
     _id_iter = itertools.count()
     bit_type = None
 
-    def __init__(self, size=0):
+    def __init__(self, arg):
         self.idx = next(self._id_iter)
-        self.bits = [self.bit_type(i, self) for i in range(size)]
+        self.bits = init_bits(arg, self.bit_type, self)
 
     @property
     def n(self):
@@ -71,6 +88,22 @@ class Register:
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.idx}, size: {self.n})"
+
+    def __str__(self):
+        string = self.__repr__()
+        for bit in self.bits:
+            string += "\n  -" + str(bit)
+        return string
+
+    def list(self, bits):
+        if bits is None:
+            return None
+        bitlist = list()
+        for c in to_list(bits):
+            if not isinstance(c, self.bit_type):
+                c = self.bits[c]
+            bitlist.append(c)
+        return bitlist
 
     def __getitem__(self, item):
         if hasattr(item, "__len__"):
@@ -94,10 +127,10 @@ class ClRegister(Register):
 
     bit_type = Clbit
 
-    def __init__(self, size=0, values=0):
-        super().__init__(size)
+    def __init__(self, arg=0, values=0):
+        super().__init__(arg)
         if not hasattr(values, "__len__"):
-            values = np.ones(size) * values
+            values = np.ones(self.n) * values
         self.values = np.asarray(values)
 
     @classmethod
@@ -111,9 +144,3 @@ class QuRegister(Register):
 
     def __init__(self, size=0):
         super().__init__(size)
-
-    def __str__(self):
-        string = ""
-
-
-

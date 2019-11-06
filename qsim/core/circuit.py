@@ -8,7 +8,7 @@ version: 1.0
 """
 import numpy as np
 from scitools import Plot, Terminal
-from .register import Qubit, Clbit, QuRegister
+from .register import Qubit, Clbit, QuRegister, ClRegister
 from .utils import Basis, get_info, to_list, histogram
 from .visuals import CircuitString
 from .instruction import Gate, Measurement, Instruction, ParameterMap
@@ -102,10 +102,10 @@ def init_bits(arg, bit_type):
 class Circuit:
 
     def __init__(self, qubits, clbits=None, backend=StateVector.name):
-        self.qubits = init_bits(qubits, Qubit)
+        self.qureg = QuRegister(qubits)
         if clbits is None:
             clbits = len(self.qubits)
-        self.clbits = init_bits(clbits, Clbit)
+        self.clreg = ClRegister(clbits)
         self.basis = Basis(self.n_qubits)
         self.instructions = list()
         self.pmap = ParameterMap.instance()
@@ -121,12 +121,20 @@ class Circuit:
         return cls(other.qubits, other.clbits, other.backend.name)
 
     @property
+    def qubits(self):
+        return self.qureg.bits
+
+    @property
     def n_qubits(self):
-        return len(self.qubits)
+        return self.qureg.n
+
+    @property
+    def clbits(self):
+        return self.clreg.bits
 
     @property
     def n_clbits(self):
-        return len(self.clbits)
+        return self.clreg.n
 
     @property
     def n_params(self):
@@ -254,37 +262,37 @@ class Circuit:
         self.instructions.append(inst)
         return inst
 
-    def _get_qubits(self, bits):
-        if bits is None:
-            return None
-        bitlist = list()
-        for q in to_list(bits):
-            if not isinstance(q, Qubit):
-                q = self.qubits[q]
-            bitlist.append(q)
-        return bitlist
+    # def _get_qubits(self, bits):
+    #     if bits is None:
+    #         return None
+    #     bitlist = list()
+    #     for q in to_list(bits):
+    #         if not isinstance(q, Qubit):
+    #             q = self.qubits[q]
+    #         bitlist.append(q)
+    #     return bitlist
 
-    def _get_clbits(self, bits):
-        if bits is None:
-            return None
-        bitlist = list()
-        for c in to_list(bits):
-            if not isinstance(c, Clbit):
-                c = self.clbits[c]
-            bitlist.append(c)
-        return bitlist
+    # def _get_clbits(self, bits):
+    #     if bits is None:
+    #         return None
+    #     bitlist = list()
+    #     for c in to_list(bits):
+    #         if not isinstance(c, Clbit):
+    #             c = self.clbits[c]
+    #         bitlist.append(c)
+    #     return bitlist
 
     def add_gate(self, name, qubits, con=None, arg=None, argidx=None, n=1):
         if qubits is None:
             qubits = self.qubits
-        qubits = self._get_qubits(qubits)
-        con = self._get_qubits(con)
+        qubits = self.qureg.list(qubits)
+        con = self.qureg.list(con)
         gates = Gate(name, qubits, con=con, arg=arg, argidx=argidx, n=n)
         return self.add(gates)
 
     def add_measurement(self, qubits, clbits):
-        qubits = self._get_qubits(qubits)
-        clbits = self._get_clbits(clbits)
+        qubits = self.qureg.list(qubits)
+        clbits = self.clreg.list(clbits)
         m = Measurement("m", qubits, clbits)
         return self.add(m)
 
@@ -346,12 +354,12 @@ class Circuit:
         return self.add_gate("Rz", qubit, con, arg, argidx)
 
     def xy(self, qubit1, qubit2, arg=0, argidx=None):
-        qubits = self._get_qubits([qubit1, qubit2])
+        qubits = self.qureg.list([qubit1, qubit2])
         gate = Gate("XY", qubits, arg=arg, argidx=argidx, n=2)
         return self.add(gate)
 
     def b(self, qubit1, qubit2, arg=0, argidx=None):
-        qubits = self._get_qubits([qubit1, qubit2])
+        qubits = self.qureg.list([qubit1, qubit2])
         gate = Gate("B", qubits, arg=arg, argidx=argidx, n=2)
         return self.add(gate)
 
@@ -363,7 +371,7 @@ class Circuit:
         self.add_measurement(qubits, clbits)
 
     def measure(self, qubits):
-        qubits = self._get_qubits(qubits)
+        qubits = self.qureg.list(qubits)
         return self.backend.measure(qubits)
 
     def state(self):
