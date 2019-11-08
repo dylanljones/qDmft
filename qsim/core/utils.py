@@ -8,6 +8,7 @@ version: 0.1
 """
 import re
 import numpy as np
+from scitools import Plot
 
 si = np.eye(2)
 sx = np.array([[0, 1], [1, 0]])
@@ -89,17 +90,6 @@ def get_bit(bit_list, idx):
             return bit
 
 
-def histogram(data, normalize=True):
-    n, n_bins = data.shape
-    binvals = np.power(2, np.arange(n_bins))[::-1]
-    data = np.sum(data * binvals[np.newaxis, :], axis=1)
-    hist, edges = np.histogram(data, bins=np.arange(2 ** n_bins+1))
-    bins = edges[:-1].astype("int")  # + 0.5
-    if normalize:
-        hist = hist / n
-    return bins, hist
-
-
 class Basis:
 
     def __init__(self, n):
@@ -117,3 +107,115 @@ class Basis:
 
     def __str__(self):
         return "Basis(" + ", ".join(self.labels) + ")"
+
+
+def histogram(data, normalize=True):
+    n, n_bins = data.shape
+    binvals = np.power(2, np.arange(n_bins))[::-1]
+    data = np.sum(data * binvals[np.newaxis, :], axis=1)
+    hist, edges = np.histogram(data, bins=np.arange(2 ** n_bins+1))
+    bins = edges[:-1].astype("int")  # + 0.5
+    if normalize:
+        hist = hist / n
+    return bins, hist
+
+
+class Result:
+
+    def __init__(self, data):
+        self.data = None
+        self.basis = None
+        self.hist = None
+        self.load(data)
+
+    def load(self, data, normalize=True):
+        self.data = data
+        self.basis = Basis(data.shape[1])
+        self.hist = histogram(data, normalize)
+
+    @property
+    def shape(self):
+        """tuple: shape of the data array (n_measurements, n_bits)"""
+        return self.data.shape
+
+    @property
+    def n(self):
+        """int: number of measurments"""
+        return self.shape[0]
+
+    @property
+    def n_bits(self):
+        """int: number of bits"""
+        return self.shape[1]
+
+    @property
+    def labels(self):
+        """list of str: Labels of the basis-states of the measured qubits"""
+        return self.basis.labels
+
+    def sorted(self):
+        """ Returns the sorted bins of the measurment histogram data (descending probability)
+
+        Returns
+        -------
+        hist: list of tuples
+            sorted histogram data with descending probability
+        """
+        bins, probs = self.hist
+        indices = np.argsort(probs)[::-1]
+        return [(bins[i], probs[i]) for i in indices]
+
+    def expected(self):
+        """ Returns the most occuring binary value and the corresponding simulate_probability
+
+        Returns
+        -------
+
+        value: int
+            Expected binary result (0 or 1)
+        p: float
+            Probability of the result
+        """
+        return self.sorted()[0]
+
+    def mean(self):
+        """ returns the mean of the measurments
+
+        mean: np.ndarray
+            mean value of each qubit for all measurments
+        """
+        return np.mean(self.data, axis=0)
+
+    def highest(self, thresh=0.7):
+        res_sorted = self.sorted()
+        pmax = res_sorted[0][1]
+        return [(self.labels[i], p) for i, p in res_sorted if p >= thresh * pmax]
+
+    def show_histogram(self, show=True, print_values=True, max_line=True, padding=0.2,
+                       color=None, alpha=0.9, lc="r", lw=1, text_padding=0, scale=False):
+        bins, hist = self.hist
+        plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1.1), title=f"N={self.n}")
+        plot.grid(axis="y")
+        plot.set_ticks(bins, np.arange(0, 1.1, 0.2))
+        plot.set_ticklabels(self.labels)
+        # plot.draw_lines(y=1, color="0.5")
+        plot.bar(bins, hist, width=1-padding, color=color, alpha=0.9)
+        ymax = np.max(hist)
+        if print_values:
+            ypos = ymax + text_padding + 0.02
+            for x, y in zip(bins, hist):
+                col = "0.5" if y != ymax else "0.0"
+                if y:
+                    plot.text((x, ypos), s=f"{y:.2f}", ha="center", va="center", color=col)
+        if max_line:
+            plot.draw_lines(y=ymax, color=lc, lw=lw)
+
+        if show:
+            plot.show()
+        return plot
+
+    def __str__(self):
+        entries = [f"   {label} {p:.3f}" for label, p in self.highest()]
+        string = f"Result ({self.n} shots):\n"
+        string += "\n".join(entries)
+        return string

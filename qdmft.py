@@ -24,7 +24,7 @@ def time_evolution_circuit(arg, step):
         c.xy(1, 2, arg)
         c.xy(3, 4, arg)
         c.b(1, 3, arg)
-    c.cx(0, 1)
+    c.cy(0, 1)
     c.h(0)
     return c
 
@@ -44,13 +44,14 @@ def main():
 
     values = np.zeros(n, "complex")
     for i in range(n):
+        print(i)
         c = get_twosite_circuit(arg, i)
-        c.run()
-        values[i] = c.backend.expectation(Y_GATE, 0)
+        c.my(0)
+        res = c.run(100)
+        values[i] = res.mean()
 
     plot = Plot()
     plot.plot(values.real)
-    plot.plot(values.imag)
     plot.show()
 
     # s.apply_gate(xy_gate(np.pi/3))

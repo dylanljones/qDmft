@@ -9,7 +9,7 @@ version: 1.0
 import re
 from .params import ParameterMap
 from .utils import to_list, get_bit
-from .gates import GATE_DICT, cgate, single_gate
+from .gates import GATE_DICT, cgate, single_gate, X_GATE, Y_GATE, Z_GATE
 
 
 def str_to_list(s, dtype=int):
@@ -22,6 +22,7 @@ class Instruction:
 
     INDEX = 0
     TYPE = "Instruction"
+    GATE_DICT = GATE_DICT
     pmap = ParameterMap.instance()
 
     def __init__(self, name, qubits=None, con=None, clbits=None, n=1, arg=None, argidx=None):
@@ -138,16 +139,42 @@ class Measurement(Instruction):
 
     TYPE = "Measurement"
 
-    def __init__(self, name, qubits, clbits=None):
+    def __init__(self, name, qubits, clbits=None, basis=None):
         if clbits is None:
             clbits = qubits
         super().__init__(name, qubits, clbits=clbits)
+        self.basis = basis
+
+    @classmethod
+    def x(cls, qubits, clbits=None):
+        return cls("m", qubits, clbits, basis="x")
+
+    @classmethod
+    def y(cls, qubits, clbits=None):
+        return cls("m", qubits, clbits, basis="y")
+
+    @classmethod
+    def z(cls, qubits, clbits=None):
+        return cls("m", qubits, clbits, basis="z")
+
+    def basis_operator(self):
+        if not self.basis:
+            return None
+            
+        if self.basis.lower() == "x":
+            return X_GATE
+        elif self.basis.lower() == "y":
+            return Y_GATE
+        elif self.basis.lower() == "z":
+            return Z_GATE
+        else:
+            return None
+
 
 
 class Gate(Instruction):
 
     TYPE = "Gate"
-    GATE_DICT = GATE_DICT
 
     def __init__(self, name, qubits, con=None, arg=None, argidx=None, n=1):
         super().__init__(name, qubits, con=con, n=n, arg=arg, argidx=argidx)

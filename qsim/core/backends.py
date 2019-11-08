@@ -113,17 +113,14 @@ class StateVector(Backend):
     def probabilities(self, decimals=10):
         return np.abs(self.amplitudes(decimals))**2
 
-    def get_projected(self, projection):
-        return np.dot(projection, self.amp)
-
     def build_operator(self, idx, op):
         parts = [np.eye(2)] * self.n_qubits
         parts[idx] = op
         return kron(parts)
 
     def project(self, idx, op):
-        proj = self.build_operator(idx, op)
-        return self.get_projected(proj)
+        projection = self.build_operator(idx, op)
+        return np.dot(projection, self.amp)
 
     def expectation(self, op, idx=None):
         if idx is not None:
@@ -142,12 +139,16 @@ class StateVector(Backend):
             gate = gate.build_matrix(self.n_qubits)  # self.build_gate(gate)
         self.amp = np.dot(gate, self.amp)
 
-    def _measure_qubit(self, qubit, shadow=False):
+    @staticmethod
+    def _simulate(p):
+        return int(np.random.random() > p)
+
+    def _projective_measurement(self, qubit, shadow=False):
         idx = qubit.index
         # Simulate measurement of qubit q
         projected = self.project(idx, P0)
-        p0 = np.sum(np.abs(projected) ** 2)
-        value = int(np.random.random() > p0)
+        p0 = np.dot(self.amp, projected)
+        value = self._simulate(p0)
         if value == 1:
             projected = self.project(idx, P1)
         # Project other qubits and normalize
@@ -155,14 +156,34 @@ class StateVector(Backend):
             self.amp = projected / la.norm(projected)
         return value
 
-    def measure(self, qbits, snapshot=True, shadow=False):
+    def _general_measurement(self, qubit, basis, shadow=False):
+        idx = qubit.index
+        # get eigenbasis of measurment operator
+        eigvals, eigvecs = la.eig(basis)
+        v0, v1 = eigvecs.T
+        # Simulate measurement of qubit q
+        op = np.dot(v0[:, np.newaxis], v0[np.newaxis, :])
+        projected = self.project(idx, op)
+        p0 = np.sum(np.abs(projected))**2
+        value = self._simulate(p0)
+        if value == 1:
+            op = np.dot(v1[:, np.newaxis], v1[np.newaxis, :])
+            projected = self.project(idx, op)
+        # Project other qubits and normalize
+        if not shadow:
+            self.amp = projected / la.norm(projected)
+        return eigvals[value]
+
+    def measure_qubit(self, qubit, basis=None, shadow=False):
+        if basis is None:
+            return self._projective_measurement(qubit, shadow)
+        else:
+            return self._general_measurement(qubit, basis, shadow)
+
+    def measure(self, qbits, basis=None, snapshot=True, shadow=False):
         if snapshot:
             self.save_snapshot()
-        return [self._measure_qubit(q, shadow) for q in to_array(qbits)]
+        return [self.measure_qubit(q, basis, shadow) for q in to_array(qbits)]
 
     def histogram(self):
         return np.arange(self.n), np.abs(self.amp)
-
-    def measure2(self, qbit, op=Z_GATE):
-        x = np.dot(self.amp, self.project(qbit, op))
-        print(x)

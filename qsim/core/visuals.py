@@ -213,14 +213,15 @@ class CircuitString(Visualizer):
         outer[1 - idx] = " "
         self.layer[con_out] = outer
 
-    def add_measurement(self, qbits, cbits):
+    def add_measurement(self, qbits, cbits, basis=None):
+        basis = "" if basis is None else basis
         for q, c in zip(qbits, cbits):
-            self.add_gate(q, f"M {c}")
+            self.add_gate(q, f"M{basis} {c}")
 
     def add(self, inst, padding=0, show_arg=True):
         self.next_layer()
         if inst.name.lower() == "m":
-            self.add_measurement(inst.qu_indices, inst.cl_indices)
+            self.add_measurement(inst.qu_indices, inst.cl_indices, inst.basis)
         elif inst.is_controlled:
             self.add_control_gate(inst, padding)
         else:

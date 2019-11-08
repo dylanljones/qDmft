@@ -9,83 +9,10 @@ version: 1.0
 import numpy as np
 from scitools import Plot, Terminal
 from .register import Qubit, Clbit, QuRegister, ClRegister
-from .utils import Basis, get_info, to_list, histogram
+from .utils import Basis, get_info, to_list, histogram, Result
 from .visuals import CircuitString
 from .instruction import Gate, Measurement, Instruction, ParameterMap
 from .backends import StateVector
-
-
-class CircuitResult:
-
-    def __init__(self, data):
-        self.data = None
-        self.basis = None
-        self.hist = None
-        self.load(data)
-
-    def load(self, data, normalize=True):
-        self.data = data
-        self.basis = Basis(data.shape[1])
-        self.hist = histogram(data, normalize)
-
-    @property
-    def shape(self):
-        return self.data.shape
-
-    @property
-    def n(self):
-        return self.shape[0]
-
-    @property
-    def n_bits(self):
-        return self.shape[1]
-
-    @property
-    def labels(self):
-        return self.basis.labels
-
-    def mean(self):
-        return self.sorted()[0]
-
-    def sorted(self):
-        bins, probs = self.hist
-        indices = np.argsort(probs)[::-1]
-        return [(bins[i], probs[i]) for i in indices]
-
-    def highest(self, thresh=0.7):
-        res_sorted = self.sorted()
-        pmax = res_sorted[0][1]
-        return [(self.labels[i], p) for i, p in res_sorted if p >= thresh * pmax]
-
-    def show_histogram(self, show=True, print_values=True, max_line=True, padding=0.2,
-                       color=None, alpha=0.9, lc="r", lw=1, text_padding=0, scale=False):
-        bins, hist = self.hist
-        plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1.1), title=f"N={self.n}")
-        plot.grid(axis="y")
-        plot.set_ticks(bins, np.arange(0, 1.1, 0.2))
-        plot.set_ticklabels(self.labels)
-        # plot.draw_lines(y=1, color="0.5")
-        plot.bar(bins, hist, width=1-padding, color=color, alpha=0.9)
-
-        ymax = np.max(hist)
-        if print_values:
-            ypos = ymax + text_padding + 0.02
-            for x, y in zip(bins, hist):
-                col = "0.5" if y != ymax else "0.0"
-                if y:
-                    plot.text((x, ypos), s=f"{y:.2f}", ha="center", va="center", color=col)
-        if max_line:
-            plot.draw_lines(y=ymax, color=lc, lw=lw)
-
-        if show:
-            plot.show()
-        return plot
-
-    def __str__(self):
-        entries = [f"   {label} {p:.3f}" for label, p in self.highest()]
-        string = f"Result ({self.n} shots):\n"
-        string += "\n".join(entries)
-        return string
 
 
 def init_bits(arg, bit_type):
@@ -262,26 +189,6 @@ class Circuit:
         self.instructions.append(inst)
         return inst
 
-    # def _get_qubits(self, bits):
-    #     if bits is None:
-    #         return None
-    #     bitlist = list()
-    #     for q in to_list(bits):
-    #         if not isinstance(q, Qubit):
-    #             q = self.qubits[q]
-    #         bitlist.append(q)
-    #     return bitlist
-
-    # def _get_clbits(self, bits):
-    #     if bits is None:
-    #         return None
-    #     bitlist = list()
-    #     for c in to_list(bits):
-    #         if not isinstance(c, Clbit):
-    #             c = self.clbits[c]
-    #         bitlist.append(c)
-    #     return bitlist
-
     def add_gate(self, name, qubits, con=None, arg=None, argidx=None, n=1):
         if qubits is None:
             qubits = self.qubits
@@ -290,10 +197,14 @@ class Circuit:
         gates = Gate(name, qubits, con=con, arg=arg, argidx=argidx, n=n)
         return self.add(gates)
 
-    def add_measurement(self, qubits, clbits):
+    def add_measurement(self, qubits, clbits, basis=None):
+        if qubits is None:
+            qubits = range(self.n_qubits)
+        if clbits is None:
+            clbits = qubits
         qubits = self.qureg.list(qubits)
         clbits = self.clreg.list(clbits)
-        m = Measurement("m", qubits, clbits)
+        m = Measurement("m", qubits, clbits, basis=basis)
         return self.add(m)
 
     def i(self, qubit=None):
@@ -364,28 +275,35 @@ class Circuit:
         return self.add(gate)
 
     def m(self, qubits=None, clbits=None):
-        if qubits is None:
-            qubits = range(self.n_qubits)
-        if clbits is None:
-            clbits = range(self.n_qubits)
         self.add_measurement(qubits, clbits)
 
-    def measure(self, qubits):
+    def mx(self, qubits=None, clbits=None):
+        self.add_measurement(qubits, clbits, "x")
+
+    def my(self, qubits=None, clbits=None):
+        self.add_measurement(qubits, clbits, "y")
+
+    def mz(self, qubits=None, clbits=None):
+        self.add_measurement(qubits, clbits, "z")
+
+    # =========================================================================
+
+    def measure(self, qubits, basis=None):
         qubits = self.qureg.list(qubits)
-        return self.backend.measure(qubits)
+        return self.backend.measure(qubits, basis)
 
     def state(self):
         return self.backend.state()
 
     def run_shot(self, *args, **kwargs):
         self.init()
-        data = np.zeros(self.n_clbits)
+        data = np.zeros(self.n_clbits, dtype="complex")
         for inst in self.instructions:
             if isinstance(inst, Gate):
                 self.backend.apply_gate(inst, *args, **kwargs)
             elif isinstance(inst, Measurement):
-                data = np.zeros(self.n_clbits)
-                values = self.backend.measure(inst.qubits)
+                op = inst.basis_operator()
+                values = self.backend.measure(inst.qubits, basis=op)
                 for idx, x in zip(inst.cl_indices, values):
                     data[idx] = x
         return data
@@ -396,15 +314,16 @@ class Circuit:
         if verbose:
             terminal.write(header)
 
-        data = np.zeros((shots, self.n_clbits))
+        data = np.zeros((shots, self.n_clbits), dtype="complex")
         for i in range(shots):
             data[i] = self.run_shot(*args, **kwargs)
             if verbose:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
-        self.res = CircuitResult(data)
+        self.res = Result(data)
         if verbose:
             terminal.writeln()
-            val, p = self.res.mean()
+            val, p = self.res.expected()
+            state = self.basis.labels[val]
             terminal.writeln(f"Result: {val} (p={p:.2f})")
         return self.res
 
