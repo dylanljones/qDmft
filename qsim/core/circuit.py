@@ -10,9 +10,9 @@ import numpy as np
 from scitools import Plot, Terminal
 from .register import Qubit, Clbit, QuRegister, ClRegister
 from .utils import Basis, get_info, to_list, histogram, Result
-from .visuals import CircuitString
-from .instruction import Gate, Measurement, Instruction, ParameterMap
+from .instruction import Instruction, ParameterMap, Gate, Measurement
 from .backends import StateVector
+from .visuals import CircuitString
 
 
 def init_bits(arg, bit_type):
