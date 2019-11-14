@@ -36,21 +36,23 @@ def hamiltonian(u=4, v=1, eps_bath=2, mu=2):
     return 1/2 * (h1 + h2 + h3 + h4)
 
 
-def vqe_circuit(depth=2):
+def vqe_circuit():
     c = Circuit(4)
-    c.h(0)
-    for i in range(depth):
-        c.cx(0, 1)
-        c.cx(0, 2)
-        c.cx(0, 3)
-        c.ry(1)
-        c.ry(2)
-        c.ry(3)
-    c.h(0)
+    c.ry(0)
+    c.ry(1)
+    c.ry(2)
+    c.ry(3)
+    c.cx(2, 3)
+    c.ry(2)
+    c.ry(3)
+    c.cx(0, 2)
+    c.ry(0)
+    c.ry(2)
+    c.cx(0, 1)
     return c
 
 
-def get_opt_circuit(new=False, depth=2, file=FILE):
+def prepare_ground_state(new=False, file=FILE):
     print()
     if not new:
         try:
@@ -59,9 +61,9 @@ def get_opt_circuit(new=False, depth=2, file=FILE):
             return c
         except FileNotFoundError:
             print(f"No file {file} found.")
-    vqe = VqeSolver(hamiltonian(), vqe_circuit(depth))
+    vqe = VqeSolver(hamiltonian(), vqe_circuit())
     vqe.solve(verbose=True)
-    file = vqe.save(file)
+    file = vqe.save(file, )
     print(f"Saving circuit: {file}")
     print()
     return vqe.circuit
@@ -93,18 +95,8 @@ def main():
     n = 20
     arg = v/2 * tau/n
 
-    values = np.zeros(n, "complex")
-    for i in range(n):
-        print(i)
-        c = get_twosite_circuit(arg, i)
-        c.my(0)
-        res = c.run(100)
-        values[i] = res.mean()
-
-    plot = Plot()
-    plot.plot(values.real)
-    plot.show()
-
+    c = prepare_ground_state()
+    c.print()
     # s.apply_gate(xy_gate(np.pi/3))
 
 
