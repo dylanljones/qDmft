@@ -120,7 +120,6 @@ def prepare_ground_state(ham, circuit_config, file="", new=False, clbits=1, verb
             print(f"No file {file} found.")
     vqe = VqeSolver(ham, clbits)
     circuit_config(vqe)
-    vqe.circuit.print()
     vqe.solve(verbose=verbose)
     if file:
         file = vqe.save(file)

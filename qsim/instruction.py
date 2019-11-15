@@ -8,27 +8,9 @@ version: 1.0
 """
 import re
 import numpy as np
-from .core.utils import to_list, get_bit, kron
+from .core.utils import to_list, get_bit, kron, str_to_list
 from .core.gates import GATE_DICT, single_gate, cgate, X_GATE, Y_GATE, Z_GATE
 
-
-def str_to_list(s, dtype=int):
-    """ Convert a string of numbers into list of given data-type
-
-    Parameters
-    ----------
-    s: str
-        String of list
-    dtype: type
-        Data type of the list
-
-    Returns
-    -------
-    data_list: list
-    """
-    if s.strip() == "None":
-        return None
-    return [dtype(x) for x in re.findall(r'(\d+(?:\.\d+)?)', s)]
 
 
 class ParameterMap:
@@ -133,6 +115,7 @@ class Instruction:
         self.qubits = to_list(qubits) if qubits is not None else None
         self.con = to_list(con) if con is not None else None
         self.clbits = to_list(clbits) if clbits is not None else None
+
         self.pmap.add(arg, argidx)
 
     @property
@@ -223,7 +206,6 @@ class Instruction:
 
         arg = str_to_list(args["arg"], float) if args["arg"] != "None" else None
         argidx = str_to_list(args["argidx"], int) if args["argidx"] != "None" else None
-
         if name.lower() == "m":
             inst = Measurement(name, qubits=qubits, clbits=clbits)
         else:

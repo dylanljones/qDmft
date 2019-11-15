@@ -52,10 +52,7 @@ class Operator:
 
     CHARS = "↑", "↓"
 
-    def __init__(self, idx, spin, array=None):
-
-        self.index = idx
-        self.spin = spin
+    def __init__(self, array=None):
         if isinstance(array, Operator):
             array = array.csr
         self.csr = csr_matrix(array)
@@ -69,19 +66,15 @@ class Operator:
     def creation_operator(cls, idx, states, spin):
         return cls.annihilation_operator(idx, states, spin).dag
 
-    def like(self, array):
-        return Operator(self.index, self.spin, array)
-
     def todense(self):
         return self.csr.todense()
 
-    def jordan_wigner(self, n_sites, idx=None):
-        if idx is None:
-            i = 2 * self.index
-            idx = i - 1 if self.spin == 0 else i
+    def jordan_wigner(self, idx, spin, n_sites):
+        i = 2 * idx
+        idx = i - 1 if spin == 0 else i
         parts = [sz] * idx + [si] * (2 * n_sites - idx)
         parts[idx] = s_minus
-        return 0.5 * self.like(np.conj(kron(parts)).T)
+        return 0.5 * Operator(np.conj(kron(parts)).T)
 
     @property
     def dense(self):
@@ -93,15 +86,15 @@ class Operator:
 
     @property
     def dag(self):
-        return np.conj(self.csr).T
+        return Operator(np.conj(self.csr).T)
 
     @property
     def abs(self):
-        return self.like(np.abs(self.csr))
+        return Operator(np.abs(self.csr))
 
     @property
     def nop(self):
-        return self.dag * self
+        return Operator(self.dag * self)
 
     @staticmethod
     def _get_value(other):
@@ -110,25 +103,28 @@ class Operator:
         return other
 
     def dot(self, other):
-        return self.like(self.csr.dot(self._get_value(other)))
+        return Operator(self.csr.dot(self._get_value(other)))
+
+    def __neg__(self):
+        return Operator(-self.csr)
 
     def __mul__(self, other):
-        return self.like(self.csr * self._get_value(other))
+        return Operator(self.csr * self._get_value(other))
 
     def __rmul__(self, other):
-        return self.like(self._get_value(other) * self.csr)
+        return Operator(self._get_value(other) * self.csr)
 
     def __truediv__(self, other):
-        return self.like(self.csr / self._get_value(other))
+        return Operator(self.csr / self._get_value(other))
 
     def __rtruediv__(self, other):
-        return self.like(self._get_value(other) / self.csr)
+        return Operator(self._get_value(other) / self.csr)
 
     def __add__(self, other):
-        return self.like(self.csr + self._get_value(other))
+        return Operator(self.csr + self._get_value(other))
 
     def __radd__(self, other):
-        return self.like(self._get_value(other) + self.csr)
+        return Operator(self._get_value(other) + self.csr)
 
     def __repr__(self):
         return f"C{self.index}{self.CHARS[self.spin]}"

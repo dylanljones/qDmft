@@ -72,11 +72,25 @@ def to_list(x):
     return list(x)
 
 
-def str_to_list(string, dtype=int):
-    if string.strip() == "None":
+def str_to_list(s, dtype=int):
+    """ Convert a string of numbers into list of given data-type
+
+    Parameters
+    ----------
+    s: str
+        String of list
+    dtype: type
+        Data type of the list
+
+    Returns
+    -------
+    data_list: list
+    """
+    s = s.strip()
+    if s == "None":
         return None
-    string = string.replace("[").replace("]")
-    return [dtype(x) for x in string.split(" ")]
+    pattern = '-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?'
+    return [dtype(x) for x in re.findall(pattern, s)]
 
 
 def get_info(string, key, delim="; "):

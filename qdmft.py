@@ -10,7 +10,7 @@ import os
 import numpy as np
 from scitools import Plot
 from qsim import kron, pauli
-from qsim import Circuit, VqeSolver, test_vqe
+from qsim import Circuit, VqeSolver, prepare_ground_state, test_vqe
 
 VQE_FILE = "circuits/twosite_vqe"
 
@@ -40,7 +40,7 @@ def config_vqe_circuit(vqe):
     return c
 
 
-def prepare_ground_state(new=False, file=VQE_FILE, verbose=True):
+def prepare_ground_state2(new=False, file=VQE_FILE, verbose=True):
     print()
     if not new:
         try:
@@ -95,8 +95,7 @@ def main():
     n = 20
     arg = v/2 * tau/n
     ham = hamiltonian()
-    print(ham.real)
-    c = prepare_ground_state(new=True)
+    c = prepare_ground_state(ham, config_vqe_circuit, file=VQE_FILE)
     c.print()
     # s.apply_gate(xy_gate(np.pi/3))
 
