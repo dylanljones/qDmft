@@ -10,22 +10,15 @@ import os
 import numpy as np
 from scitools import Plot
 from qsim import kron, pauli
-from qsim import Circuit, Z_GATE, X_GATE, Y_GATE
-from qsim.vqe import VqeSolver
+from qsim import Circuit, VqeSolver, test_vqe
 
 VQE_FILE = "circuits/twosite_vqe"
 
-
-import os
-import numpy as np
-from scitools import Plot
-from qsim import kron, pauli
-from qsim import Circuit
-from qsim.vqe import VqeSolver
-
 si, sx, sy, sz = pauli
 
-FILE = "test_vqe"
+# =========================================================================
+#                         GROUND STATE PREPARATION
+# =========================================================================
 
 
 def hamiltonian(u=4, v=1, eps_bath=2, mu=2):
@@ -36,37 +29,44 @@ def hamiltonian(u=4, v=1, eps_bath=2, mu=2):
     return 1/2 * (h1 + h2 + h3 + h4)
 
 
-def vqe_circuit():
-    c = Circuit(4)
-    c.ry(0)
-    c.ry(1)
-    c.ry(2)
-    c.ry(3)
+def config_vqe_circuit(vqe):
+    c = vqe.circuit
+    c.ry([0, 1, 2, 3])
     c.cx(2, 3)
-    c.ry(2)
-    c.ry(3)
+    c.ry([2, 3])
     c.cx(0, 2)
-    c.ry(0)
-    c.ry(2)
+    c.ry([0, 2])
     c.cx(0, 1)
     return c
 
 
-def prepare_ground_state(new=False, file=FILE):
+def prepare_ground_state(new=False, file=VQE_FILE, verbose=True):
     print()
     if not new:
         try:
             c = Circuit.load(file)
-            print(f"Circuit: {file} loaded!")
+            if verbose:
+                print(f"Circuit: {file} loaded!")
             return c
         except FileNotFoundError:
             print(f"No file {file} found.")
-    vqe = VqeSolver(hamiltonian(), vqe_circuit())
-    vqe.solve(verbose=True)
-    file = vqe.save(file, )
-    print(f"Saving circuit: {file}")
-    print()
+    vqe = VqeSolver(hamiltonian(), 1)
+    config_vqe_circuit(vqe)
+    vqe.solve(verbose=verbose)
+    file = vqe.save(file)
+    if verbose:
+        print(f"Saving circuit: {file}")
+        print()
     return vqe.circuit
+
+
+def test_gs_preparation(circuit):
+    test_vqe(circuit, hamiltonian())
+
+
+# =========================================================================
+#                            TIME EVOLUTION
+# =========================================================================
 
 
 def time_evolution_circuit(arg, step):
@@ -83,7 +83,7 @@ def time_evolution_circuit(arg, step):
 
 
 def get_twosite_circuit(arg, step):
-    c = get_opt_circuit(file=FILE)
+    c = prepare_ground_state()
     c.add_qubit(0)
     c.append(time_evolution_circuit(arg, step))
     return c
@@ -94,8 +94,9 @@ def main():
     v = 4
     n = 20
     arg = v/2 * tau/n
-
-    c = prepare_ground_state()
+    ham = hamiltonian()
+    print(ham.real)
+    c = prepare_ground_state(new=True)
     c.print()
     # s.apply_gate(xy_gate(np.pi/3))
 

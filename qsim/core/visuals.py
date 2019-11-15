@@ -218,6 +218,15 @@ class CircuitString(Visualizer):
         for q, c in zip(qbits, cbits):
             self.add_gate(q, f"M{basis} {c}")
 
+    @staticmethod
+    def _label(inst, argidx=0, show_arg=True, dec=1):
+        string = inst.name
+        if show_arg:
+            arg = inst.get_arg(argidx)
+            if arg:
+                string += f" ({arg:.{dec}f})"
+        return string
+
     def add(self, inst, padding=0, show_arg=True):
         self.next_layer()
         if inst.name.lower() == "m":
@@ -225,14 +234,13 @@ class CircuitString(Visualizer):
         elif inst.is_controlled:
             self.add_control_gate(inst, padding)
         else:
-            name = inst.name
-            if show_arg and inst.arg is not None:
-                name += f" ({inst.arg:.1f})"
             if inst.size == len(inst.qubits):
-                self.add_gate(inst.qu_indices, name, padding)
+                label = self._label(inst, 0, show_arg)
+                self.add_gate(inst.qu_indices, label, padding)
             else:
-                for q in inst.qubits:
-                    self.add_gate([q.index], name, padding)
+                for i, q in enumerate(inst.qubits):
+                    label = self._label(inst, i, show_arg)
+                    self.add_gate([q.index], label, padding)
 
     def add_end(self, width=2):
         self.next_layer()

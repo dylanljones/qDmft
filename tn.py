@@ -10,7 +10,7 @@ import numpy as np
 import scipy.linalg as la
 from scipy import sparse
 from scitools import Plot
-from qsim import QuRegister, StateVector
+from qsim.core import QuRegister, StateVector
 
 
 def measure_tensor(tensor, idx, decimals=10):

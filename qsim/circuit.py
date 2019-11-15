@@ -7,12 +7,12 @@ project: qsim
 version: 1.0
 """
 import numpy as np
-from scitools import Plot, Terminal
-from .register import Qubit, Clbit, QuRegister, ClRegister
-from .utils import Basis, get_info, to_list, histogram, Result
+from scitools import Terminal
+from .core.register import Qubit, Clbit, QuRegister, ClRegister
+from .core.utils import Basis, get_info, Result, expectation
+from .core.backends import StateVector
+from .core.visuals import CircuitString
 from .instruction import Instruction, ParameterMap, Gate, Measurement
-from .backends import StateVector
-from .visuals import CircuitString
 
 
 def init_bits(arg, bit_type):
@@ -294,6 +294,9 @@ class Circuit:
 
     def state(self):
         return self.backend.state()
+
+    def expectation(self, operator):
+        return expectation(operator, self.state())
 
     def run_shot(self, *args, **kwargs):
         self.init()

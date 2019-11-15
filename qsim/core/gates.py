@@ -8,7 +8,7 @@ version: 0.1
 """
 import numpy as np
 from itertools import product
-from .utils import kron, P0, P1
+from .utils import kron, P0, P1, pauli
 
 
 # ======================== SINGLE QUBIT GATES =======================
@@ -66,15 +66,16 @@ def rz_gate(phi=0):
 
 # =========================================================================
 
-def single_gate(qbits, gate, n):
+def single_gate(qbits, gates, n):
     """ Builds matrix of a n-bit control gate
 
     Parameters
     ----------
     qbits: int or list of int
-        Index of control-qubit(s)
-    gate: array_like
-        Matrix of the gate that is controlled
+        Index of control-qubit(s).
+    gates: list of (2, 2) ndarray or (2, 2) ndarray
+        Matrix-representation of the single qubit gate.
+        A matrix for each qubit index in 'qbits' must be given
     n: int, optional
         Total number of qubits. If not specified
         number of involved qubits is used
@@ -84,10 +85,15 @@ def single_gate(qbits, gate, n):
     """
     if not hasattr(qbits, "__len__"):
         qbits = [qbits]
+        gates = [gates]
     eye = np.eye(2)
     arrs = list()
-    for i in range(n):
-        arrs.append(gate if i in qbits else eye)
+    for qbit in range(n):
+        part = eye
+        if qbit in qbits:
+            idx = qbits.index(qbit)
+            part = gates[idx]
+        arrs.append(part)
     return kron(arrs)
 
 

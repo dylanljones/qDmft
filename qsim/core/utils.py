@@ -43,7 +43,7 @@ def kron(*args):
 
 
 def expectation(op, v):
-    return np.dot(v, op.dot(v))
+    return np.dot(v, op.dot(v)).real
 
 
 def basis_states(n):
@@ -158,12 +158,12 @@ class Result:
 
         Returns
         -------
-        hist: list of tuples
+        hist: array_like
             sorted histogram data with descending probability
         """
         bins, probs = self.hist
         indices = np.argsort(probs)[::-1]
-        return [(bins[i], probs[i]) for i in indices]
+        return list([(bins[i], probs[i]) for i in indices])
 
     def expected(self):
         """ Returns the most occuring binary value and the corresponding simulate_probability

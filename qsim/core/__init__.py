@@ -8,7 +8,5 @@ version: 0.1
 """
 from .utils import *
 from .gates import *
-from .instruction import Instruction, ParameterMap, Gate, Measurement
 from .backends import StateVector
-from .circuit import Circuit
 from .register import Qubit, Clbit, QuRegister, ClRegister

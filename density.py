@@ -9,7 +9,7 @@ version: 0.1
 import re, os
 import numpy as np
 import itertools
-from qsim import *
+from qsim.core import *
 from scitools import Matrix
 
 si, sx, sy, sz = pauli

@@ -8,11 +8,24 @@ version: 1.0
 """
 import re
 import numpy as np
-from .utils import to_list, get_bit
-from .gates import GATE_DICT, single_gate, cgate, X_GATE, Y_GATE, Z_GATE
+from .core.utils import to_list, get_bit, kron
+from .core.gates import GATE_DICT, single_gate, cgate, X_GATE, Y_GATE, Z_GATE
 
 
 def str_to_list(s, dtype=int):
+    """ Convert a string of numbers into list of given data-type
+
+    Parameters
+    ----------
+    s: str
+        String of list
+    dtype: type
+        Data type of the list
+
+    Returns
+    -------
+    data_list: list
+    """
     if s.strip() == "None":
         return None
     return [dtype(x) for x in re.findall(r'(\d+(?:\.\d+)?)', s)]
@@ -37,6 +50,10 @@ class ParameterMap:
         return len(self.indices)
 
     @property
+    def num_args(self):
+        return len(self.args)
+
+    @property
     def num_params(self):
         return len(self.params)
 
@@ -51,33 +68,47 @@ class ParameterMap:
                 args = np.zeros(args)
         self.set(args)
 
-    def set(self, args):
-        self.params = list(args)
-
-    def add_param(self, value):
-        self.params.append(value)
-
     def __getitem__(self, item):
         return self.params[item]
 
     def __setitem__(self, key, value):
         self.params[key] = value
 
-    def add(self, value=None, idx=None):
-        next_idx = None
-        if idx is None:
-            if value is not None:
-                next_idx = len(self.params)
-                self.params.append(value)
+    def set(self, args):
+        self.params = list(args)
+
+    def add_param(self, value):
+        self.params.append(value)
+
+    def link_param(self, idx):
+        self.indices.append(idx)
+
+    def add_arg(self, args, idx=None):
+        if not hasattr(args, "__len__"):
+            args = [args]
+        indices = list()
+        for i, x in enumerate(args):
+            indices.append(len(self.params) if idx is None else idx[i])
+            self.params.append(x)
+        self.indices.append(indices)
+
+    def add_empty(self):
+        self.indices.append(None)
+
+    def add(self, arg=None, idx=None):
+        if arg is not None:
+            self.add_arg(arg, idx)
+        elif idx is not None:
+            self.link_param(idx)
         else:
-            next_idx = idx
-        self.indices.append(next_idx)
+            self.add_empty()
 
     def get(self, i):
-        idx = self.indices[i]
-        if idx is None:
+        indices = self.indices[i]
+        if indices is None:
             return None
-        return self.params[idx]
+        args = [self.params[i] for i in indices]
+        return args
 
     def __str__(self):
         return f"Params: {self.params}, Indices: {self.indices}"
@@ -102,7 +133,6 @@ class Instruction:
         self.qubits = to_list(qubits) if qubits is not None else None
         self.con = to_list(con) if con is not None else None
         self.clbits = to_list(clbits) if clbits is not None else None
-
         self.pmap.add(arg, argidx)
 
     @property
@@ -138,8 +168,11 @@ class Instruction:
         return self.pmap.indices[self.idx]
 
     @property
-    def arg(self):
+    def args(self):
         return self.pmap.get(self.idx)
+
+    def get_arg(self, i=0):
+        return self.args[i] if self.args is not None else None
 
     def _attr_str(self):
         parts = [self.name, f"ID: {self.idx}"]
@@ -149,19 +182,16 @@ class Instruction:
             parts.append(f"con: {self.con_indices}")
         if self.n_clbits:
             parts.append(f"cBits: {self.cl_indices}")
-        if self.arg is not None:
-            parts.append(f"Args: {self.arg}")
+        if self.args is not None:
+            parts.append(f"Args: {self.args}")
         return ", ".join(parts)
 
     def __str__(self):
         return f"{self.TYPE}({self._attr_str()})"
 
-    def set_arg(self, value):
-        self.pmap.set(self.idx, value)
-
     def to_dict(self):
         return dict(idx=self.idx, name=self.name, qbits=self.qu_indices,
-                    con=self.con_indices, cbits=self.cl_indices, arg=self.arg,
+                    con=self.con_indices, cbits=self.cl_indices, arg=self.args,
                     argidx=self.argidx)
 
     def to_string(self, delim="; "):
@@ -191,11 +221,9 @@ class Instruction:
         if cl_indices is not None:
             clbits = [get_bit(clbit_list, idx) for idx in cl_indices]
 
-        arg = float(args["arg"]) if args["arg"] != "None" else None
-        argidx = int(args["argidx"]) if args["argidx"] != "None" else None
-        if argidx == cls.pmap.num_params:
-            arg = arg or 0
-            argidx = None
+        arg = str_to_list(args["arg"], float) if args["arg"] != "None" else None
+        argidx = str_to_list(args["argidx"], int) if args["argidx"] != "None" else None
+
         if name.lower() == "m":
             inst = Measurement(name, qubits=qubits, clbits=clbits)
         else:
@@ -244,6 +272,11 @@ class Gate(Instruction):
     TYPE = "Gate"
 
     def __init__(self, name, qubits, con=None, arg=None, argidx=None, n=1):
+        if hasattr(qubits, "__len__"):
+            if arg is not None and not hasattr(arg, "__len__"):
+                arg = [arg] * len(qubits)
+            if argidx is not None and not hasattr(argidx, "__len__"):
+                argidx = [argidx] * len(qubits)
         super().__init__(name, qubits, con=con, n=n, arg=arg, argidx=argidx)
         if con is not None:
             self.name = "c" * len(self.con) + self.name
@@ -299,15 +332,34 @@ class Gate(Instruction):
             raise KeyError(f"Gate-function \'{name}\' not in dictionary")
         return func
 
+    def _qubit_gate_matrix(self, idx):
+        arg = self.get_arg(idx)
+        func = self._get_gatefunc(self.name)
+        return func(arg)
+
+    def _build_single_gate(self, n_qubits):
+        indices = self.qu_indices
+        eye = np.eye(2)
+        arrs = list()
+        for qbit in range(n_qubits):
+            part = eye
+            if qbit in indices:
+                idx = indices.index(qbit)
+                part = self._qubit_gate_matrix(idx)
+            arrs.append(part)
+        return kron(arrs)
+
     def build_matrix(self, n_qubits):
         if self.is_controlled:
             name = self.name.replace("c", "")
             gate_func = self._get_gatefunc(name)
-            arr = cgate(self.con_indices, self.qu_indices[0], gate_func(self.arg), n_qubits)
+            arr = cgate(self.con_indices, self.qu_indices[0], gate_func(self.get_arg()), n_qubits)
         elif self.size > 1:
             gate_func = self._get_gatefunc(self.name)
-            arr = gate_func(self.qu_indices, n_qubits, self.arg)
+            arr = gate_func(self.qu_indices, n_qubits, self.get_arg())
         else:
-            gate_func = self._get_gatefunc(self.name)
-            arr = single_gate(self.qu_indices, gate_func(self.arg), n_qubits)
+            # arr = self._build_single_gate(n_qubits)
+            indices = self.qu_indices
+            gate_matrices = list([self._qubit_gate_matrix(i) for i in range(len(indices))])
+            arr = single_gate(indices, gate_matrices, n_qubits)
         return arr

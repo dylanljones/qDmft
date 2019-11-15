@@ -10,7 +10,8 @@ import os
 import numpy as np
 import scipy.linalg as la
 from scipy import optimize
-from .core import Circuit
+from .circuit import Circuit
+from .core.utils import expectation
 
 
 class VqeResult(optimize.OptimizeResult):
@@ -44,17 +45,22 @@ class VqeResult(optimize.OptimizeResult):
         return self.string()
 
 
-def expectation(operator, state):
-    return np.dot(state, np.dot(operator, state).T).real
-
-
 class VqeSolver:
 
-    def __init__(self, ham, circuit=None):
-        self.ham = ham
+    def __init__(self, ham, num_clbits=None):
+        self.ham = None
+        self.gs_ref = 0
+        self.circuit = None
+        self.res = None
+        self.init(ham, num_clbits)
+
+    def init(self, ham, num_clbits=None):
+        num_qubits = int(np.log2(ham.shape[0]))
         eigvals, eigstates = la.eigh(ham)
-        self.gs_ref = np.min(eigvals)
-        self.circuit = circuit
+        gs = np.min(eigvals)
+        self.ham = ham
+        self.gs_ref = gs
+        self.circuit = Circuit(num_qubits, num_clbits)
         self.res = None
 
     @property
@@ -79,14 +85,14 @@ class VqeSolver:
     def expectation(self, params):
         self.circuit.set_params(params)
         self.circuit.run_shot()
-        return expectation(self.ham, self.circuit.state())
+        return self.circuit.expectation(self.ham)
 
     def eigval(self):
         if self.success:
             return self.expectation(self.res.x)
         return None
 
-    def solve(self, x0=None, tol=1e-10, verbose=True):
+    def solve(self, x0=None, tol=1e-10, verbose=False):
         if verbose:
             print("Optimizing Vqe circuit:")
         if x0 is None:
@@ -100,3 +106,35 @@ class VqeSolver:
 
     def save(self, name):
         return self.circuit.save(name + ".circ")
+
+
+def prepare_ground_state(ham, circuit_config, file="", new=False, clbits=1, verbose=True):
+    print()
+    if file and not new:
+        try:
+            c = Circuit.load(file)
+            if verbose:
+                print(f"Circuit: {file} loaded!")
+            return c
+        except FileNotFoundError:
+            print(f"No file {file} found.")
+    vqe = VqeSolver(ham, clbits)
+    circuit_config(vqe)
+    vqe.circuit.print()
+    vqe.solve(verbose=verbose)
+    if file:
+        file = vqe.save(file)
+        if verbose:
+            print(f"Saving circuit: {file}")
+    print()
+    return vqe.circuit
+
+
+def test_vqe(c, ham, dec=5):
+    eigvals, eigstates = la.eigh(ham)
+    gs_ref = np.min(eigvals)
+    c.run_shot()
+    gs = c.expectation(ham)
+    print(f"Ground state:    {gs_ref:.{dec}}")
+    print(f"VQE-Preperation: {gs:.{dec}}")
+    print(f"Error:           {abs(gs_ref-gs):.3}")

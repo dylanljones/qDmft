@@ -122,10 +122,13 @@ class StateVector(Backend):
         parts[idx] = op
         return np.dot(kron(parts), self.amp)
 
+    def apply_unitary(self, u):
+        self.amp = np.dot(u, self.amp)
+
     def apply_gate(self, gate, *args, **kwargs):
         if not isinstance(gate, np.ndarray):
             gate = gate.build_matrix(self.n_qubits)  # self.build_gate(gate)
-        self.amp = np.dot(gate, self.amp)
+        self.apply_unitary(gate)
 
     def measure_qubit(self, qubit, basis=None, shadow=False):
         r""" Measure the state of a single qubit in a given eigenbasis.
