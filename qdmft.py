@@ -16,17 +16,27 @@ VQE_FILE = "circuits/twosite_vqe"
 
 si, sx, sy, sz = pauli
 
+
 # =========================================================================
 #                         GROUND STATE PREPARATION
 # =========================================================================
 
 
-def hamiltonian(u=4, v=1, eps_bath=2, mu=2):
-    h1 = u / 2 * (kron(sz, si, sz, si) - kron(sz, si, si, si) - kron(si, si, sz, si))
-    h2 = mu * (kron(sz, si, si, si) + kron(si, si, sz, si))
-    h3 = - eps_bath * (kron(si, sz, si, si) + kron(si, si, si, sz))
-    h4 = v * (kron(sx, sx, si, si) + kron(sy, sy, si, si) + kron(si, si, sx, sx) + kron(si, si, sy, sy))
-    return 1/2 * (h1 + h2 + h3 + h4)
+def twosite_hamop(basis):
+    (c1u, c2u), (c1d, c2d) = basis.annihilation_ops()
+    u_op = (c1u.dag * c1u * c1d.dag * c1d)
+    mu_op = (c1u.dag * c1u) + (c1d.dag * c1d)
+    eps_op = (c2u.dag * c2u) + (c2u.dag * c2u)
+    v_op = (c1u.dag * c2u) + (c2u.dag * c1u) + (c1d.dag * c2d) + (c2d.dag * c1d)
+    return HamiltonOperator(u=u_op, mu=-mu_op, eps=eps_op, v=v_op)
+
+
+def hamiltonian_sig(u=4, eps=2, mu=2, v=1):
+    u_op = 1/2 * (kron(sz, si, sz, si) - kron(sz, si, si, si) - kron(si, si, sz, si))
+    mu_op = (kron(sz, si, si, si) + kron(si, si, sz, si))
+    eps_op = (kron(si, sz, si, si) + kron(si, si, si, sz))
+    v_op = kron(sx, sx, si, si) + kron(sy, sy, si, si) + kron(sy, sy, sx, sx) + kron(si, si, sy, sy)
+    return 1/2 * (u * u_op + mu * mu_op - eps * eps_op + v * v_op)
 
 
 def config_vqe_circuit(vqe):
@@ -38,30 +48,6 @@ def config_vqe_circuit(vqe):
     c.ry([0, 2])
     c.cx(0, 1)
     return c
-
-
-def prepare_ground_state2(new=False, file=VQE_FILE, verbose=True):
-    print()
-    if not new:
-        try:
-            c = Circuit.load(file)
-            if verbose:
-                print(f"Circuit: {file} loaded!")
-            return c
-        except FileNotFoundError:
-            print(f"No file {file} found.")
-    vqe = VqeSolver(hamiltonian(), 1)
-    config_vqe_circuit(vqe)
-    vqe.solve(verbose=verbose)
-    file = vqe.save(file)
-    if verbose:
-        print(f"Saving circuit: {file}")
-        print()
-    return vqe.circuit
-
-
-def test_gs_preparation(circuit):
-    test_vqe(circuit, hamiltonian())
 
 
 # =========================================================================
@@ -94,7 +80,7 @@ def main():
     v = 4
     n = 20
     arg = v/2 * tau/n
-    ham = hamiltonian()
+    ham = hamiltonian_sig()
     c = prepare_ground_state(ham, config_vqe_circuit, file=VQE_FILE)
     c.print()
     # s.apply_gate(xy_gate(np.pi/3))
