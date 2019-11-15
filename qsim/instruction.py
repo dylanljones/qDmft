@@ -128,7 +128,18 @@ class Instruction:
 
     @property
     def qu_indices(self):
-        return [q.index for q in self.qubits] if self.qubits is not None else None
+        if self.qubits is None:
+            return None
+        indices = list()
+        for qubits in self.qubits:
+            if isinstance(qubits, list):
+                idxlist =list()
+                for q in qubits:
+                    idxlist.append(q.index)
+                indices.append(idxlist)
+            else:
+                indices.append(qubits.index)
+        return indices
 
     @property
     def n_con(self):
@@ -337,8 +348,13 @@ class Gate(Instruction):
             gate_func = self._get_gatefunc(name)
             arr = cgate(self.con_indices, self.qu_indices[0], gate_func(self.get_arg()), n_qubits)
         elif self.size > 1:
+            print("Multi")
+            indices = self.qu_indices
+            n_gates = len(indices)
             gate_func = self._get_gatefunc(self.name)
-            arr = gate_func(self.qu_indices, n_qubits, self.get_arg())
+            arr = gate_func(self.qu_indices[0], n_qubits, self.get_arg(0))
+            for i in range(1, n_gates):
+                arr = np.dot(arr, gate_func(self.qu_indices[i], n_qubits, self.get_arg(i)))
         else:
             # arr = self._build_single_gate(n_qubits)
             indices = self.qu_indices

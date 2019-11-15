@@ -11,7 +11,7 @@ from scitools import Terminal
 from .core.register import Qubit, Clbit, QuRegister, ClRegister
 from .core.utils import Basis, get_info, Result, expectation
 from .core.backends import StateVector
-from .core.visuals import CircuitString
+from .visuals import CircuitString
 from .instruction import Instruction, ParameterMap, Gate, Measurement
 
 
@@ -264,13 +264,17 @@ class Circuit:
     def crz(self, con, qubit, arg=np.pi/2, argidx=None):
         return self.add_gate("Rz", qubit, con, arg, argidx)
 
-    def xy(self, qubit1, qubit2, arg=0, argidx=None):
-        qubits = self.qureg.list([qubit1, qubit2])
+    def xy(self, qubits, arg=0, argidx=None):
+        if not hasattr(qubits[0], "__len__"):
+            qubits = [qubits]
+        qubits = [self.qureg.list(pair) for pair in qubits]
         gate = Gate("XY", qubits, arg=arg, argidx=argidx, n=2)
         return self.add(gate)
 
-    def b(self, qubit1, qubit2, arg=0, argidx=None):
-        qubits = self.qureg.list([qubit1, qubit2])
+    def b(self, qubits, arg=0, argidx=None):
+        if not hasattr(qubits[0], "__len__"):
+            qubits = [qubits]
+        qubits = [self.qureg.list(pair) for pair in qubits]
         gate = Gate("B", qubits, arg=arg, argidx=argidx, n=2)
         return self.add(gate)
 

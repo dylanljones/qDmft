@@ -108,7 +108,7 @@ class VqeSolver:
         return self.circuit.save(name + ".circ")
 
 
-def prepare_ground_state(ham, circuit_config, file="", new=False, clbits=1, verbose=True):
+def prepare_ground_state(ham, circuit_config, file="",x0=None, new=False, clbits=1, verbose=True):
     print()
     if file and not new:
         try:
@@ -120,7 +120,7 @@ def prepare_ground_state(ham, circuit_config, file="", new=False, clbits=1, verb
             print(f"No file {file} found.")
     vqe = VqeSolver(ham, clbits)
     circuit_config(vqe)
-    vqe.solve(verbose=verbose)
+    vqe.solve(x0=x0, verbose=verbose)
     if file:
         file = vqe.save(file)
         if verbose:

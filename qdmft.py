@@ -16,6 +16,7 @@ VQE_FILE = "circuits/twosite_vqe"
 
 si, sx, sy, sz = pauli
 
+X0 = [5.7578, 3.1416, 3.6519, 2.8804, 4.5688, 5.9859, 4.187, 4.7124]
 
 # =========================================================================
 #                         GROUND STATE PREPARATION
@@ -60,9 +61,8 @@ def time_evolution_circuit(arg, step):
     c.h(0)
     c.cx(0, 1)
     for i in range(step):
-        c.xy(1, 2, arg)
-        c.xy(3, 4, arg)
-        c.b(1, 3, arg)
+        c.xy([[1, 2], [3, 4]], [arg, arg])
+        c.b([1, 3], arg)
     c.cy(0, 1)
     c.h(0)
     return c
@@ -81,8 +81,14 @@ def main():
     n = 20
     arg = v/2 * tau/n
     ham = hamiltonian_sig()
-    c = prepare_ground_state(ham, config_vqe_circuit, file=VQE_FILE)
-    c.print()
+    c = prepare_ground_state(ham, config_vqe_circuit, x0=X0, file=VQE_FILE, new=True, clbits=0)
+    c.add_qubit(0, add_clbit=True)
+
+    u = time_evolution_circuit(np.pi/2, 2)
+    c.append(u)
+    c.print(show_args=False)
+
+
     # s.apply_gate(xy_gate(np.pi/3))
 
 

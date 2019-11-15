@@ -13,35 +13,15 @@ from scipy import sparse
 from qsim.core import *
 from qsim import Circuit, Gate, prepare_ground_state, test_vqe
 from qsim.fermions import FBasis, Operator, HamiltonOperator
-from qsim.twosite_siam import twosite_basis, twosite_hamop, twosite_hamop_sigma
 
 si, sx, sy, sz = pauli
 
 
-def str_to_list(s, dtype=int):
-    """ Convert a string of numbers into list of given data-type
-
-    Parameters
-    ----------
-    s: str
-        String of list
-    dtype: type
-        Data type of the list
-
-    Returns
-    -------
-    data_list: list
-    """
-    if s.strip() == "None":
-        return None
-    pattern = '-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?'
-    return [dtype(x) for x in re.findall(pattern, s)]
-
-
 def main():
-    string = "[-3.614e-08, 6.283185260406262, 2.6779442784401732, -0.0017198866433262613]"
-    print(str_to_list(string, float))
-
+    c = Circuit(4)
+    c.ry([0, 1], [1, 2])
+    c.run()
+    c.print()
 
 if __name__ == "__main__":
     main()

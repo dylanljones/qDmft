@@ -221,10 +221,9 @@ class CircuitString(Visualizer):
     @staticmethod
     def _label(inst, argidx=0, show_arg=True, dec=1):
         string = inst.name
-        if show_arg:
-            arg = inst.get_arg(argidx)
-            if arg:
-                string += f" ({arg:.{dec}f})"
+        arg = inst.get_arg(argidx)
+        if arg and show_arg:
+            string += f" ({arg:.{dec}f})"
         return string
 
     def add(self, inst, padding=0, show_arg=True):
@@ -234,9 +233,16 @@ class CircuitString(Visualizer):
         elif inst.is_controlled:
             self.add_control_gate(inst, padding)
         else:
-            if inst.size == len(inst.qubits):
-                label = self._label(inst, 0, show_arg)
-                self.add_gate(inst.qu_indices, label, padding)
+
+            n_gates = len(inst.qubits)
+            print(n_gates)
+            if inst.size > 1:
+                for i, qubits in enumerate(inst.qubits):
+                    indices = [q.index for q in qubits]
+                    label = self._label(inst, i, show_arg)
+                    self.add_gate(indices, label, padding)
+                # label = self._label(inst, 0, show_arg)
+                # self.add_gate(inst.qu_indices, label, padding)
             else:
                 for i, q in enumerate(inst.qubits):
                     label = self._label(inst, i, show_arg)
