@@ -158,7 +158,7 @@ class StateVector(Backend):
 
         Returns
         -------
-        result: complex or float
+        result: float
             Eigenvalue corresponding to the measured eigenstate.
         """
         idx = qubit.index
@@ -184,7 +184,7 @@ class StateVector(Backend):
         if not shadow:
             self.amp = projected / la.norm(projected)
         # return corresponding eigenvalue of the measured eigenstate
-        return eigvals[index]
+        return eigvals[index].real
 
     def measure(self, qbits, basis=None, snapshot=True, shadow=False):
         if snapshot:

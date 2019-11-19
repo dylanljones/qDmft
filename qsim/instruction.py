@@ -6,11 +6,9 @@ author: Dylan Jones
 project: qsim
 version: 1.0
 """
-import re
 import numpy as np
 from .core.utils import to_list, get_bit, kron, str_to_list
 from .core.gates import GATE_DICT, single_gate, cgate, X_GATE, Y_GATE, Z_GATE
-
 
 
 class ParameterMap:
@@ -106,7 +104,7 @@ class Instruction:
     GATE_DICT = GATE_DICT
     pmap = ParameterMap.instance()
 
-    def __init__(self, name, qubits=None, con=None, clbits=None, n=1, arg=None, argidx=None):
+    def __init__(self, name, qubits=None, con=None, clbits=None, n=1, arg=None, argidx=None, trigger=1):
         self.idx = Instruction.INDEX
         Instruction.INDEX += 1
         self.size = n
@@ -115,7 +113,7 @@ class Instruction:
         self.qubits = to_list(qubits) if qubits is not None else None
         self.con = to_list(con) if con is not None else None
         self.clbits = to_list(clbits) if clbits is not None else None
-
+        self.con_trigger = trigger
         self.pmap.add(arg, argidx)
 
     @property
@@ -133,7 +131,7 @@ class Instruction:
         indices = list()
         for qubits in self.qubits:
             if isinstance(qubits, list):
-                idxlist =list()
+                idxlist = list()
                 for q in qubits:
                     idxlist.append(q.index)
                 indices.append(idxlist)
@@ -264,51 +262,51 @@ class Gate(Instruction):
 
     TYPE = "Gate"
 
-    def __init__(self, name, qubits, con=None, arg=None, argidx=None, n=1):
+    def __init__(self, name, qubits, con=None, arg=None, argidx=None, n=1, trigger=1):
         if hasattr(qubits, "__len__"):
             if arg is not None and not hasattr(arg, "__len__"):
                 arg = [arg] * len(qubits)
             if argidx is not None and not hasattr(argidx, "__len__"):
                 argidx = [argidx] * len(qubits)
-        super().__init__(name, qubits, con=con, n=n, arg=arg, argidx=argidx)
+        super().__init__(name, qubits, con=con, n=n, arg=arg, argidx=argidx, trigger=trigger)
         if con is not None:
             self.name = "c" * len(self.con) + self.name
 
     @classmethod
-    def x(cls, qubits, con=None):
-        return cls("X", qubits, con)
+    def x(cls, qubits, con=None, trigger=1):
+        return cls("X", qubits, con, trigger=trigger)
 
     @classmethod
-    def y(cls, qubits, con=None):
-        return cls("Y", qubits, con)
+    def y(cls, qubits, con=None, trigger=1):
+        return cls("Y", qubits, con, trigger=trigger)
 
     @classmethod
-    def z(cls, qubits, con=None):
-        return cls("Z", qubits, con)
+    def z(cls, qubits, con=None, trigger=1):
+        return cls("Z", qubits, con, trigger=trigger)
 
     @classmethod
-    def h(cls, qubits, con=None):
-        return cls("H", qubits, con)
+    def h(cls, qubits, con=None, trigger=1):
+        return cls("H", qubits, con, trigger=trigger)
 
     @classmethod
-    def s(cls, qubits, con=None):
-        return cls("S", qubits, con)
+    def s(cls, qubits, con=None, trigger=1):
+        return cls("S", qubits, con, trigger=trigger)
 
     @classmethod
-    def t(cls, qubits, con=None):
-        return cls("T", qubits, con)
+    def t(cls, qubits, con=None, trigger=1):
+        return cls("T", qubits, con, trigger=trigger)
 
     @classmethod
-    def rx(cls, qubit, arg=0, argidx=None, con=None):
-        return cls("Rx", qubit, con, arg, argidx)
+    def rx(cls, qubit, arg=0, argidx=None, con=None, trigger=1):
+        return cls("Rx", qubit, con, arg, argidx, trigger=trigger)
 
     @classmethod
-    def ry(cls, qubit, arg=0, argidx=None, con=None):
-        return cls("Ry", qubit, con, arg, argidx)
+    def ry(cls, qubit, arg=0, argidx=None, con=None, trigger=1):
+        return cls("Ry", qubit, con, arg, argidx, trigger=trigger)
 
     @classmethod
-    def rz(cls, qubit, arg=0, argidx=None, con=None):
-        return cls("Rz", qubit, con, arg, argidx)
+    def rz(cls, qubit, arg=0, argidx=None, con=None, trigger=1):
+        return cls("Rz", qubit, con, arg, argidx, trigger=trigger)
 
     @classmethod
     def xy(cls, qubit1, qubit2, arg=0, argidx=None):
@@ -346,9 +344,9 @@ class Gate(Instruction):
         if self.is_controlled:
             name = self.name.replace("c", "")
             gate_func = self._get_gatefunc(name)
-            arr = cgate(self.con_indices, self.qu_indices[0], gate_func(self.get_arg()), n_qubits)
+            gate_arr = gate_func(self.get_arg())
+            arr = cgate(self.con_indices, self.qu_indices[0], gate_arr, n_qubits, self.con_trigger)
         elif self.size > 1:
-            print("Multi")
             indices = self.qu_indices
             n_gates = len(indices)
             gate_func = self._get_gatefunc(self.name)

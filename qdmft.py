@@ -11,7 +11,7 @@ import numpy as np
 from scitools import Plot
 from qsim import kron, pauli
 from qsim import Circuit, VqeSolver, prepare_ground_state, test_vqe
-
+from qsim.fermions import HamiltonOperator
 VQE_FILE = "circuits/twosite_vqe"
 
 si, sx, sy, sz = pauli
@@ -56,37 +56,46 @@ def config_vqe_circuit(vqe):
 # =========================================================================
 
 
-def time_evolution_circuit(arg, step):
-    c = Circuit(5, 1)
-    c.h(0)
-    c.cx(0, 1)
+def time_evolution_circuit(c, arg, step=1):
     for i in range(step):
         c.xy([[1, 2], [3, 4]], [arg, arg])
         c.b([1, 3], arg)
-    c.cy(0, 1)
+    return c
+
+
+def measure_circuit(arg, step=1, alpha="x", beta="x"):
+    ham = hamiltonian_sig()
+    c = prepare_ground_state(ham, config_vqe_circuit, x0=X0, file=VQE_FILE, new=False, clbits=0)
+    c.add_qubit(0, add_clbit=True)
     c.h(0)
-    return c
+    c.add_gate(f"c{alpha}", 1, con=0, trigger=0)
+    time_evolution_circuit(c, arg, step)
+    c.add_gate(f"c{beta}", 1, con=0, trigger=1)
+    c.h(0)
+    c.mz(0)
+    data = c.run(100)
+    return np.mean(data, axis=0)
 
 
-def get_twosite_circuit(arg, step):
-    c = prepare_ground_state()
-    c.add_qubit(0)
-    c.append(time_evolution_circuit(arg, step))
-    return c
+def measure_gf(arg, step=1):
+    gxx = measure_circuit(arg, step, "x", "x")
+    gxy = measure_circuit(arg, step, "x", "y")
+    gyx = measure_circuit(arg, step, "y", "x")
+    gyy = measure_circuit(arg, step, "y", "y")
+    print(gxx, gxy, gyx, gyy)
+
+
+
+
+
 
 
 def main():
     tau = 6
     v = 4
-    n = 20
+    n = 18
     arg = v/2 * tau/n
-    ham = hamiltonian_sig()
-    c = prepare_ground_state(ham, config_vqe_circuit, x0=X0, file=VQE_FILE, new=True, clbits=0)
-    c.add_qubit(0, add_clbit=True)
-
-    u = time_evolution_circuit(np.pi/2, 2)
-    c.append(u)
-    c.print(show_args=False)
+    measure_gf(arg, 0)
 
 
     # s.apply_gate(xy_gate(np.pi/3))

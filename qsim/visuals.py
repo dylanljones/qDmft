@@ -146,8 +146,8 @@ class CircuitString(Visualizer):
 
     @staticmethod
     def _empty(w=1):
-        empty = "" # " " * w
-        line = "" # "-" * w
+        empty = ""  # " " * w
+        line = ""  # "-" * w
         return [empty, line, empty]
 
     @staticmethod
@@ -191,14 +191,16 @@ class CircuitString(Visualizer):
         self.widths[-1] = max(width, self.widths[-1])
 
     def add_control_gate(self, gate, pad=0):
+        trig = "0" if gate.con_trigger == 0 else "1"
         idx = gate.qu_indices
         con = gate.con_indices
-        self.add_gate(idx, gate.name.replace("c", ""), pad)
+        label = gate.name.replace("c", "")
+        self.add_gate(idx, label, pad)
         # Connect control qubits
         con_out, idx_out = outer_indices(con, idx)
         x0, x1 = sorted([con_out, idx_out])
         con_in = [row for row in con if x0 < row < x1]
-        con_row = ["|", "O", "|"]
+        con_row = ["|", trig, "|"]
         cross_row = ["|", "+", "|"]
         # Draw inner sections
         for row in range(self.n):
@@ -208,7 +210,7 @@ class CircuitString(Visualizer):
                 self.layer[row] = cross_row
         # Draw outer control qubit
         idx = np.sign(idx_out - con_out)
-        outer = ["O"] * 3
+        outer = [trig] * 3
         outer[1 + idx] = "|"
         outer[1 - idx] = " "
         self.layer[con_out] = outer
@@ -233,9 +235,6 @@ class CircuitString(Visualizer):
         elif inst.is_controlled:
             self.add_control_gate(inst, padding)
         else:
-
-            n_gates = len(inst.qubits)
-            print(n_gates)
             if inst.size > 1:
                 for i, qubits in enumerate(inst.qubits):
                     indices = [q.index for q in qubits]

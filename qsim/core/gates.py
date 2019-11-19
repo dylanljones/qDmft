@@ -73,7 +73,7 @@ def single_gate(qbits, gates, n):
     ----------
     qbits: int or list of int
         Index of control-qubit(s).
-    gates: list of (2, 2) ndarray or (2, 2) ndarray
+    gates: list of ndarray or ndarray
         Matrix-representation of the single qubit gate.
         A matrix for each qubit index in 'qbits' must be given
     n: int, optional
@@ -104,8 +104,8 @@ def get_projection(*items, n):
     return parts
 
 
-def cgate(con, t, gate, n=None):
-    """ Builds matrix of a n-bit control gate
+def cgate(con, t, gate, n=None, trigger=1):
+    """ Builds matrix of a n-qubit control gate
 
     Parameters
     ----------
@@ -118,6 +118,9 @@ def cgate(con, t, gate, n=None):
     n: int, optional
         Total number of qubits. If not specified
         number of involved qubits is used
+    trigger: int, optional
+        Value of control qubits that triggers gate. The default is 1.
+
     Returns
     -------
     gate: np.ndarray
@@ -131,7 +134,7 @@ def cgate(con, t, gate, n=None):
         # Projections without applying gate
         projections = [P1 if x else P0 for x in vals]
         items = list(zip(con, projections))
-        if np.all(vals):
+        if np.all(vals) == trigger:
             # Projection with applying gate
             items.append((t, gate))
         # Build projection array and add to matrix

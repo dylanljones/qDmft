@@ -1,0 +1,7 @@
+qubits=4; clbits=1; 
+idx=0; name=Ry; qbits=[0, 1, 2, 3]; con=None; cbits=None; arg=[3.141592652510336, 6.283185315536818, 2.4345244106837294, 2.330127497801463]; argidx=[0, 1, 2, 3]; 
+idx=1; name=cX; qbits=[3]; con=[2]; cbits=None; arg=None; argidx=None; 
+idx=2; name=Ry; qbits=[2, 3]; con=None; cbits=None; arg=[3.1121754319541672, 5.337486140368175]; argidx=[4, 5]; 
+idx=3; name=cX; qbits=[2]; con=[0]; cbits=None; arg=None; argidx=None; 
+idx=4; name=Ry; qbits=[0, 2]; con=None; cbits=None; arg=[3.141592641789121, 5.698970883611113]; argidx=[6, 7]; 
+idx=5; name=cX; qbits=[1]; con=[0]; cbits=None; arg=None; argidx=None; 

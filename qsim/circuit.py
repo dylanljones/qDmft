@@ -189,12 +189,12 @@ class Circuit:
         self.instructions.append(inst)
         return inst
 
-    def add_gate(self, name, qubits, con=None, arg=None, argidx=None, n=1):
+    def add_gate(self, name, qubits, con=None, arg=None, argidx=None, n=1, trigger=1):
         if qubits is None:
             qubits = self.qubits
         qubits = self.qureg.list(qubits)
         con = self.qureg.list(con)
-        gates = Gate(name, qubits, con=con, arg=arg, argidx=argidx, n=n)
+        gates = Gate(name, qubits, con, arg, argidx, n, trigger)
         return self.add(gates)
 
     def add_measurement(self, qubits, clbits, basis=None):
@@ -237,32 +237,32 @@ class Circuit:
     def rz(self, qubit, arg=np.pi/2, argidx=None):
         return self.add_gate("Rz", qubit, arg=arg, argidx=argidx)
 
-    def cx(self, con, qubit):
-        return self.add_gate("X", qubit, con)
+    def cx(self, con, qubit, trigger=1):
+        return self.add_gate("X", qubit, con, trigger=trigger)
 
-    def cy(self, con, qubit):
-        return self.add_gate("Y", qubit, con)
+    def cy(self, con, qubit, trigger=1):
+        return self.add_gate("Y", qubit, con, trigger=trigger)
 
-    def cz(self, con, qubit):
-        return self.add_gate("Z", qubit, con)
+    def cz(self, con, qubit, trigger=1):
+        return self.add_gate("Z", qubit, con, trigger=trigger)
 
-    def ch(self, con, qubit):
-        return self.add_gate("H", qubit, con)
+    def ch(self, con, qubit, trigger=1):
+        return self.add_gate("H", qubit, con, trigger=trigger)
 
-    def cs(self, con, qubit):
-        return self.add_gate("S", qubit, con)
+    def cs(self, con, qubit, trigger=1):
+        return self.add_gate("S", qubit, con, trigger=trigger)
 
-    def ct(self, con, qubit):
-        return self.add_gate("T", qubit, con)
+    def ct(self, con, qubit, trigger=1):
+        return self.add_gate("T", qubit, con, trigger=trigger)
 
-    def crx(self, con, qubit, arg=np.pi/2, argidx=None):
-        return self.add_gate("Rx", qubit, con, arg, argidx)
+    def crx(self, con, qubit, arg=np.pi/2, argidx=None, trigger=1):
+        return self.add_gate("Rx", qubit, con, arg, argidx, trigger=trigger)
 
-    def cry(self, con, qubit, arg=np.pi/2, argidx=None):
-        return self.add_gate("Ry", qubit, con, arg, argidx)
+    def cry(self, con, qubit, arg=np.pi/2, argidx=None, trigger=1):
+        return self.add_gate("Ry", qubit, con, arg, argidx, trigger=trigger)
 
-    def crz(self, con, qubit, arg=np.pi/2, argidx=None):
-        return self.add_gate("Rz", qubit, con, arg, argidx)
+    def crz(self, con, qubit, arg=np.pi/2, argidx=None, trigger=1):
+        return self.add_gate("Rz", qubit, con, arg, argidx, trigger=trigger)
 
     def xy(self, qubits, arg=0, argidx=None):
         if not hasattr(qubits[0], "__len__"):
@@ -292,19 +292,22 @@ class Circuit:
 
     # =========================================================================
 
-    def measure(self, qubits, basis=None):
-        qubits = self.qureg.list(qubits)
-        return self.backend.measure(qubits, basis)
-
     def state(self):
         return self.backend.state()
 
     def expectation(self, operator):
         return expectation(operator, self.state())
 
+    def measure(self, qubits, basis=None):
+        qubits = self.qureg.list(qubits)
+        return self.backend.measure(qubits, basis)
+
+    def apply_gate(self, inst, *args, **kwargs):
+        self.backend.apply_gate(inst, *args, **kwargs)
+
     def run_shot(self, *args, **kwargs):
         self.init()
-        data = np.zeros(self.n_clbits, dtype="complex")
+        data = np.zeros(self.n_clbits, dtype="float")
         for inst in self.instructions:
             if isinstance(inst, Gate):
                 self.backend.apply_gate(inst, *args, **kwargs)
@@ -315,7 +318,7 @@ class Circuit:
                     data[idx] = x
         return data
 
-    def run(self, shots=1, verbose=False, *args, **kwargs):
+    def run2(self, shots=1, verbose=False, *args, **kwargs):
         terminal = Terminal()
         header = "Running experiment"
         if verbose:
@@ -331,8 +334,41 @@ class Circuit:
             terminal.writeln()
             val, p = self.res.expected()
             state = self.basis.labels[val]
-            terminal.writeln(f"Result: {val} (p={p:.2f})")
+            terminal.writeln(f"Result: {val} ({state}, p={p:.2f})")
         return self.res
+
+    def run(self, shots=1, verbose=False, *args, **kwargs):
+        terminal = Terminal()
+        header = "Running experiment"
+        if verbose:
+            terminal.write(header)
+        data = np.zeros((shots, self.n_clbits), dtype="float")
+        for i in range(shots):
+            data[i] = self.run_shot(*args, **kwargs)
+            if verbose:
+                terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
+        if verbose:
+            terminal.writeln()
+            terminal.writeln(f"Result: {np.mean(data, axis=0)}")
+        return data
+
+    def simulate_expectation(self, qubit, shots=1000, basis=None, verbose=False, *args, **kwargs):
+        qubit = self.qureg.list(qubit)[0]
+        terminal = Terminal()
+        header = "Simulating expectation value"
+        if verbose:
+            terminal.write(header)
+        data = np.zeros((shots, self.n_clbits), dtype="complex")
+        for i in range(shots):
+            self.run_shot(*args, **kwargs)
+            data[i] = self.backend.measure_qubit(qubit, basis)
+            if verbose:
+                terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
+        result = np.mean(data).real
+        if verbose:
+            terminal.writeln()
+            terminal.writeln(f"Result: {result:.3}")
+        return result
 
     def histogram(self):
         return self.res.hist
