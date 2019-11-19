@@ -160,7 +160,7 @@ def xy_gatefunc(qubits, n, arg):
 
 
 def b_gatefunc(qubits, n, arg):
-    sigma = single_gate(qubits, Z_GATE, n)
+    sigma = single_gate(qubits, [Z_GATE, Z_GATE], n)
     gate = np.cos(arg) * np.eye(2**n) + np.sin(arg) * sigma
     return gate
 

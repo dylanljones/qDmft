@@ -109,7 +109,6 @@ class VqeSolver:
 
 
 def prepare_ground_state(ham, circuit_config, file="",x0=None, new=False, clbits=1, verbose=True):
-    print()
     if file and not new:
         try:
             c = Circuit.load(file)
@@ -125,7 +124,6 @@ def prepare_ground_state(ham, circuit_config, file="",x0=None, new=False, clbits
         file = vqe.save(file)
         if verbose:
             print(f"Saving circuit: {file}")
-    print()
     return vqe.circuit
 
 
