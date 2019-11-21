@@ -89,6 +89,12 @@ class StateVector(Backend):
         strings.insert(0, head)
         return "\n".join(strings) + "\n"
 
+    def save_state(self, file):
+        np.save(file, self.amp)
+
+    def load_state(self, file):
+        self.amp = np.load(file)
+
     def save_snapshot(self):
         s = StateVector(self.qubits, self.basis, self.amp)
         self.snapshots.append(s)

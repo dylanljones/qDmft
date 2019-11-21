@@ -306,7 +306,6 @@ class Circuit:
         self.backend.apply_gate(inst, *args, **kwargs)
 
     def run_shot(self, *args, **kwargs):
-        self.init()
         data = np.zeros(self.n_clbits, dtype="float")
         for inst in self.instructions:
             if isinstance(inst, Gate):
@@ -344,6 +343,7 @@ class Circuit:
             terminal.write(header)
         data = np.zeros((shots, self.n_clbits), dtype="float")
         for i in range(shots):
+            self.init()
             data[i] = self.run_shot(*args, **kwargs)
             if verbose:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
