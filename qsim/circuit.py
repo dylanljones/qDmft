@@ -9,26 +9,26 @@ version: 1.0
 import numpy as np
 from scitools import Terminal
 from .core.register import Qubit, Clbit, QuRegister, ClRegister
-from .core.utils import Basis, get_info, Result, expectation
+from .core.utils import Basis, get_info, Result
 from .core.backends import StateVector
 from .visuals import CircuitString
 from .instruction import Instruction, ParameterMap, Gate, Measurement
 
 
-def init_bits(arg, bit_type):
-    qubits = None
-    if isinstance(arg, int):
-        qubits = [bit_type(i) for i in range(arg)]
-    elif isinstance(arg, bit_type):
-        qubits = [arg]
-    elif isinstance(arg, list):
-        qubits = arg
-    return qubits
+# def init_bits(arg, bit_type):
+#     qubits = None
+#     if isinstance(arg, int):
+#         qubits = [bit_type(i) for i in range(arg)]
+#     elif isinstance(arg, bit_type):
+#         qubits = [arg]
+#     elif isinstance(arg, list):
+#         qubits = arg
+#     return qubits
 
 
 class Circuit:
 
-    def __init__(self, qubits, clbits=None, backend=StateVector.name):
+    def __init__(self, qubits, clbits=None):
         self.qureg = QuRegister(qubits)
         if clbits is None:
             clbits = len(self.qubits)
@@ -38,14 +38,11 @@ class Circuit:
         self.pmap = ParameterMap.instance()
         self.res = None
 
-        if backend == StateVector.name:
-            self.backend = StateVector(self.qubits, self.basis)
-        else:
-            raise ValueError("Invalid backend: " + backend)
+        self.state = StateVector(self.qubits, self.basis)
 
     @classmethod
     def like(cls, other):
-        return cls(other.qubits, other.clbits, other.backend.name)
+        return cls(other.qubits, other.clbits)
 
     @property
     def qubits(self):
@@ -75,11 +72,14 @@ class Circuit:
     def args(self):
         return self.pmap.args
 
-    def init(self):
-        self.backend.init()
+    def set_state(self, psi):
+        self.state.set(psi)
 
     def init_params(self, *args):
         self.pmap.init(*args)
+
+    def init(self, state):
+        self.state.set(state)
 
     def set_params(self, args):
         self.pmap.set(args)
@@ -147,7 +147,7 @@ class Circuit:
                 q.index += 1
         self.qubits.insert(idx, new)
         self.basis = Basis(self.n_qubits)
-        self.backend.set_qubits(self.qubits, self.basis)
+        self.state.set_qubits(self.qubits, self.basis)
         if add_clbit:
             self.add_clbit(idx)
 
@@ -292,27 +292,27 @@ class Circuit:
 
     # =========================================================================
 
-    def state(self):
-        return self.backend.state()
+    # def state(self):
+    #    return self.state.state()
 
     def expectation(self, operator):
-        return expectation(operator, self.state())
+        return self.state.expectation(operator)  # expectation(operator, self.state())
 
     def measure(self, qubits, basis=None):
         qubits = self.qureg.list(qubits)
-        return self.backend.measure(qubits, basis)
+        return self.state.measure(qubits, basis)
 
-    def apply_gate(self, inst, *args, **kwargs):
-        self.backend.apply_gate(inst, *args, **kwargs)
+    def apply_gate(self, inst):
+        self.state.apply_gate(inst)
 
-    def run_shot(self, *args, **kwargs):
+    def run_shot(self):
         data = np.zeros(self.n_clbits, dtype="float")
         for inst in self.instructions:
             if isinstance(inst, Gate):
-                self.backend.apply_gate(inst, *args, **kwargs)
+                self.state.apply_gate(inst)
             elif isinstance(inst, Measurement):
-                op = inst.basis_operator()
-                values = self.backend.measure(inst.qubits, basis=op)
+                eigvals, eigvecs = inst.eigenbasis()
+                values = self.state.measure(inst.qubits, eigvals, eigvecs)
                 for idx, x in zip(inst.cl_indices, values):
                     data[idx] = x
         return data
@@ -325,7 +325,7 @@ class Circuit:
 
         data = np.zeros((shots, self.n_clbits), dtype="complex")
         for i in range(shots):
-            data[i] = self.run_shot(*args, **kwargs)
+            data[i] = self.run_shot()
             if verbose:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
         self.res = Result(data)
@@ -336,15 +336,15 @@ class Circuit:
             terminal.writeln(f"Result: {val} ({state}, p={p:.2f})")
         return self.res
 
-    def run(self, shots=1, verbose=False, *args, **kwargs):
+    def run(self, shots=1, verbose=False, state0=None, *args, **kwargs):
         terminal = Terminal()
         header = "Running experiment"
         if verbose:
             terminal.write(header)
         data = np.zeros((shots, self.n_clbits), dtype="float")
         for i in range(shots):
-            self.init()
-            data[i] = self.run_shot(*args, **kwargs)
+            self.init(state0)
+            data[i] = self.run_shot()
             if verbose:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
         if verbose:
@@ -360,8 +360,8 @@ class Circuit:
             terminal.write(header)
         data = np.zeros((shots, self.n_clbits), dtype="complex")
         for i in range(shots):
-            self.run_shot(*args, **kwargs)
-            data[i] = self.backend.measure_qubit(qubit, basis)
+            self.run_shot()
+            data[i] = self.state.measure_qubit(qubit, basis)
             if verbose:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
         result = np.mean(data).real

@@ -54,7 +54,6 @@ class Clbit(Bit):
         return f"Clbit: index={self.index}, reg={reg}"
 
 
-
 def init_bits(arg, bit_type, reg=None):
     bits = None
     if isinstance(arg, int):
@@ -67,7 +66,6 @@ def init_bits(arg, bit_type, reg=None):
         for b in bits:
             b.register = reg
     return bits
-
 
 
 class Register:

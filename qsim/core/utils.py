@@ -16,13 +16,18 @@ sy = np.array([[0, -1j], [1j, 0]])
 sz = np.array([[1, 0], [0, -1]])
 pauli = si, sx, sy, sz
 
+EIGVALS = np.array([+1, -1])
+EV_X = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
+EV_Y = np.array([[1, 1j], [1j, 1]]) / np.sqrt(2)
+EV_Z = np.array([[1, 0], [0, 1]])
+
 # Initial states
 ZERO = np.array([1, 0])
 ONE = np.array([0, 1])
 PLUS = np.array([1, 1]) / np.sqrt(2)
 MINUS = np.array([1, -1]) / np.sqrt(2)
 IPLUS = np.array([1, 1j]) / np.sqrt(2)
-IMINUS = np.array([1, 1j]) / np.sqrt(2)
+IMINUS = np.array([1, -1j]) / np.sqrt(2)
 
 # State dictionary for easy initialization
 STATES = {"0": ZERO, "1": ONE, "+": PLUS, "-": MINUS, "i+": IPLUS, "i-": IMINUS}
@@ -42,12 +47,14 @@ def kron(*args):
     return x
 
 
+def get_projector(v):
+    if len(v.shape) == 1:
+        v = v[:, np.newaxis]
+    return np.dot(v, np.conj(v).T)
+
+
 def expectation(op, v):
-    return np.dot(v, op.dot(v)).real
-
-
-def basis_states(n):
-    return list(range(int(n)))
+    return np.dot(np.conj(v).T, op.dot(v))
 
 
 def binstr(x, n=None):
@@ -56,8 +63,15 @@ def binstr(x, n=None):
     return f"{string:0>{n}}"
 
 
+def basis_states(n):
+    return list(range(int(n)))
+
+
 def basis_strings(n):
     return [f"|{binstr(x, n)}>" for x in range(2 ** n)]
+
+
+# =========================================================================
 
 
 def to_array(x, *args, **kwargs):
@@ -89,19 +103,27 @@ def str_to_list(s, dtype=int):
     s = s.strip()
     if s == "None":
         return None
-    pattern = '-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?'
+    pattern = r"-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
     return [dtype(x) for x in re.findall(pattern, s)]
 
 
-def get_info(string, key, delim="; "):
+def get_info(string, key, delim=";"):
     pre = key + "="
-    return re.search(pre + r'(.*?)' + delim, string).group(1)
+    if not string.endswith(delim):
+        string += delim
+    res = re.search(pre + r'(.*?)' + delim, string)
+    return res.group(1) if res is not None else ""
 
 
-def get_bit(bit_list, idx):
-    for bit in bit_list:
-        if bit.index == idx:
-            return bit
+def histogram(data, normalize=True):
+    n, n_bins = data.shape
+    binvals = np.power(2, np.arange(n_bins))[::-1]
+    data = np.sum(data * binvals[np.newaxis, :], axis=1)
+    hist, edges = np.histogram(data, bins=np.arange(2 ** n_bins+1))
+    bins = edges[:-1].astype("int")  # + 0.5
+    if normalize:
+        hist = hist / n
+    return bins, hist
 
 
 class Basis:
@@ -121,17 +143,6 @@ class Basis:
 
     def __str__(self):
         return "Basis(" + ", ".join(self.labels) + ")"
-
-
-def histogram(data, normalize=True):
-    n, n_bins = data.shape
-    binvals = np.power(2, np.arange(n_bins))[::-1]
-    data = np.sum(data * binvals[np.newaxis, :], axis=1)
-    hist, edges = np.histogram(data, bins=np.arange(2 ** n_bins+1))
-    bins = edges[:-1].astype("int")  # + 0.5
-    if normalize:
-        hist = hist / n
-    return bins, hist
 
 
 class Result:
@@ -206,14 +217,14 @@ class Result:
         return [(self.labels[i], p) for i, p in res_sorted if p >= thresh * pmax]
 
     def show_histogram(self, show=True, print_values=True, max_line=True, padding=0.2,
-                       color=None, alpha=0.9, lc="r", lw=1, text_padding=0, scale=False):
+                       color=None, alpha=0.9, lc="r", lw=1, text_padding=0):
         bins, hist = self.hist
         plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1.1), title=f"N={self.n}")
         plot.grid(axis="y")
         plot.set_ticks(bins, np.arange(0, 1.1, 0.2))
         plot.set_ticklabels(self.labels)
         # plot.draw_lines(y=1, color="0.5")
-        plot.bar(bins, hist, width=1-padding, color=color, alpha=0.9)
+        plot.bar(bins, hist, width=1-padding, color=color, alpha=alpha)
         ymax = np.max(hist)
         if print_values:
             ypos = ymax + text_padding + 0.02

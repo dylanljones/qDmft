@@ -7,8 +7,9 @@ project: qsim
 version: 0.1
 """
 import numpy as np
+from scipy.linalg import expm
 from itertools import product
-from .utils import kron, P0, P1, pauli
+from .utils import kron, P0, P1
 
 
 # ======================== SINGLE QUBIT GATES =======================
@@ -21,31 +22,31 @@ PHASE_GATE = np.array([[1, 0], [0, 1j]])
 T_GATE = np.array([[1, 0], [0, np.exp(1j*np.pi/4)]])
 
 
-def id_gate(args):
+def id_gate(args=None):
     return np.eye(2)
 
 
-def x_gate(args):
+def x_gate(args=None):
     return X_GATE
 
 
-def y_gate(args):
+def y_gate(args=None):
     return Y_GATE
 
 
-def z_gate(args):
+def z_gate(args=None):
     return Z_GATE
 
 
-def h_gate(args):
+def h_gate(args=None):
     return HADAMARD_GATE
 
 
-def s_gate(args):
+def s_gate(args=None):
     return PHASE_GATE
 
 
-def t_gate(args):
+def t_gate(args=None):
     return T_GATE
 
 
@@ -66,7 +67,7 @@ def rz_gate(phi=0):
 
 # =========================================================================
 
-def single_gate(qbits, gates, n):
+def single_gate(qbits, gates, n=None):
     """ Builds matrix of a n-bit control gate
 
     Parameters
@@ -86,8 +87,11 @@ def single_gate(qbits, gates, n):
     if not hasattr(qbits, "__len__"):
         qbits = [qbits]
         gates = [gates]
+    if n is None:
+        n = max(qbits) + 1
     eye = np.eye(2)
     arrs = list()
+
     for qbit in range(n):
         part = eye
         if qbit in qbits:
@@ -142,6 +146,19 @@ def cgate(con, t, gate, n=None, trigger=1):
     return array
 
 
+def xy_gatefunc(qubits, n, arg):
+    q1, q2 = qubits
+    notc = cgate(q2, q1, X_GATE, n)
+    crx = cgate(q1, q2, rx_gate(4*arg), n)
+    return np.dot(notc, crx.dot(notc))
+
+
+def b_gatefunc(qubits, n, arg):
+    sigma = single_gate(qubits, [Z_GATE, Z_GATE], n)
+    gate = expm(-1j * sigma * arg)
+    return gate
+
+
 # =========================================================================
 
 
@@ -150,19 +167,6 @@ def swap_single_cgate(gate):
     gate_tensor = np.swapaxes(gate_tensor, 0, 1)  # Switch qubit 1
     gate_tensor = np.swapaxes(gate_tensor, 2, 3)  # Switch qubit 2
     return gate_tensor.reshape((4, 4))            # reshape 2x2x2x2 tensor to 4x4 gate
-
-
-def xy_gatefunc(qubits, n, arg):
-    q1, q2 = qubits
-    notc = cgate(q2, q1, X_GATE, n)
-    crx = cgate(q1, q2, rx_gate(arg), n)
-    return np.dot(notc, crx.dot(notc))
-
-
-def b_gatefunc(qubits, n, arg):
-    sigma = single_gate(qubits, [Z_GATE, Z_GATE], n)
-    gate = np.cos(arg) * np.eye(2**n) + np.sin(arg) * sigma
-    return gate
 
 
 GATE_DICT = {"i": id_gate, "x": x_gate, "y": y_gate, "z": z_gate,

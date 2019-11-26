@@ -7,7 +7,8 @@ project: qsim
 version: 1.0
 """
 import numpy as np
-from .core.utils import to_list, get_bit, kron, str_to_list
+from .core.utils import to_list, kron, str_to_list
+from .core.utils import EIGVALS, EV_X, EV_Y, EV_Z
 from .core.gates import GATE_DICT, single_gate, cgate, X_GATE, Y_GATE, Z_GATE
 
 
@@ -92,6 +93,12 @@ class ParameterMap:
 
     def __str__(self):
         return f"Params: {self.params}, Indices: {self.indices}"
+
+
+def get_bit(bit_list, idx):
+    for bit in bit_list:
+        if bit.index == idx:
+            return bit
 
 
 pmap = ParameterMap.instance()
@@ -244,18 +251,17 @@ class Measurement(Instruction):
     def z(cls, qubits, clbits=None):
         return cls("m", qubits, clbits, basis="z")
 
-    def basis_operator(self):
+    def eigenbasis(self):
         if not self.basis:
             return None
-
         if self.basis.lower() == "x":
-            return X_GATE
+            return EIGVALS, EV_X
         elif self.basis.lower() == "y":
-            return Y_GATE
+            return EIGVALS, EV_Y
         elif self.basis.lower() == "z":
-            return Z_GATE
+            return EIGVALS, EV_Z
         else:
-            return None
+            return None, None
 
 
 class Gate(Instruction):
@@ -354,7 +360,6 @@ class Gate(Instruction):
             for i in range(1, n_gates):
                 arr = np.dot(arr, gate_func(self.qu_indices[i], n_qubits, self.get_arg(i)))
         else:
-            # arr = self._build_single_gate(n_qubits)
             indices = self.qu_indices
             gate_matrices = list([self._qubit_gate_matrix(i) for i in range(len(indices))])
             arr = single_gate(indices, gate_matrices, n_qubits)
