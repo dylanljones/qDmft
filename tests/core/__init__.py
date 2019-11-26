@@ -6,11 +6,3 @@ author: Dylan Jones
 project: qsim
 version: 1.0
 """
-
-
-def main():
-    pass
-
-
-if __name__ == "__main__":
-    main()

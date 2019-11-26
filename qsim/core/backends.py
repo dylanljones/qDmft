@@ -144,9 +144,31 @@ class StateVector:
         return np.dot(kron(parts), self.amp)
 
     def apply_unitary(self, u):
+        r""" Apply unitary operator to teh statevector.
+
+        The new state after applying the unitary operator is given by
+        .. math::
+            |\Psi'> = \hat{U} |\Psi>
+
+        Parameters
+        ----------
+        u: (N, N) array_like
+            Unitary operator to apply to statevector.
+        """
         self.amp = np.dot(u, self.amp)
 
     def apply_gate(self, gate):
+        r""" Apply Gate (unitary operator) to the statevector
+
+        See Also
+        --------
+        StateVector.apply_unitary
+
+        Parameters
+        ----------
+        gate: np.ndarray or Gate
+            Unitary operator or Gate-object to apply to statevector.
+        """
         if not isinstance(gate, np.ndarray):
             gate = gate.build_matrix(self.n_qubits)
         self.apply_unitary(gate)
