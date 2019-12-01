@@ -6,12 +6,10 @@ author: Dylan Jones
 project: qsim
 version: 0.1
 """
-import os
 import numpy as np
 import scipy.linalg as la
 from scipy import optimize
-from .circuit import Circuit
-from .core.utils import expectation
+from qsim.core.circuit import Circuit
 
 
 class VqeResult(optimize.OptimizeResult):

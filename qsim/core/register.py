@@ -13,13 +13,13 @@ from .utils import to_list
 
 class Bit:
 
-    CUNTER = 0
+    COUNTER = 0
 
     def __init__(self, index=None, register=None):
-        index = Bit.CUNTER if index is None else index
+        index = Bit.COUNTER if index is None else index
         self.index = index
         self.register = register
-        Bit.CUNTER += 1
+        Bit.COUNTER += 1
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.index})"
@@ -70,7 +70,7 @@ def init_bits(arg, bit_type, reg=None):
 
 class Register:
     _id_iter = itertools.count()
-    bit_type = None
+    bit_type = Bit
 
     def __init__(self, arg):
         self.idx = next(self._id_iter)

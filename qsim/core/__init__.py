@@ -10,3 +10,6 @@ from .utils import *
 from .gates import *
 from .backends import StateVector
 from .register import Qubit, Clbit, QuRegister, ClRegister
+from .instruction import Gate, Measurement, ParameterMap
+from .circuit import Circuit
+from .visuals import *

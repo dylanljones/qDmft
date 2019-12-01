@@ -7,9 +7,9 @@ project: qsim
 version: 1.0
 """
 import numpy as np
-from .core.utils import to_list, kron, str_to_list
-from .core.utils import EIGVALS, EV_X, EV_Y, EV_Z
-from .core.gates import GATE_DICT, single_gate, cgate, X_GATE, Y_GATE, Z_GATE
+from .utils import to_list, kron, str_to_list
+from .utils import EIGVALS, EV_X, EV_Y, EV_Z
+from .gates import GATE_DICT, single_gate, cgate
 
 
 class ParameterMap:

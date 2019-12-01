@@ -8,9 +8,9 @@ version: 1.0
 """
 import numpy as np
 from scitools import Terminal
-from .core.register import Qubit, Clbit, QuRegister, ClRegister
-from .core.utils import Basis, get_info, Result
-from .core.backends import StateVector
+from .register import Qubit, Clbit, QuRegister, ClRegister
+from .utils import Basis, get_info, Result
+from .backends import StateVector
 from .visuals import CircuitString
 from .instruction import Instruction, ParameterMap, Gate, Measurement
 

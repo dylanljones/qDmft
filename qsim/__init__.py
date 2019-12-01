@@ -6,7 +6,5 @@ author: Dylan Jones
 project: qsim
 version: 0.1
 """
-from .core.utils import *
-from .instruction import ParameterMap, Instruction, Gate, Measurement
-from .circuit import Circuit
+from .core import *
 from .vqe import VqeSolver, test_vqe, prepare_ground_state

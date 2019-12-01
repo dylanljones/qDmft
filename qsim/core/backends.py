@@ -222,7 +222,7 @@ class StateVector:
         projector_0 = get_projector(v0)
         projected = self.project(idx, projector_0)
         p0 = np.dot(np.conj(self.amp).T, projected)
-        if p0.imag != 0:
+        if abs(p0.imag) > 1e-15:
             raise ValueError(f"Complex probability: {p0}")
         # Simulate measurement probability
         index = int(np.random.random() > p0.real)
@@ -304,7 +304,7 @@ class StateVector:
             projected = np.dot(projector, self.amp)
             p = np.dot(np.conj(self.amp).T, projected)
             projections[i] = projected
-            if p.imag != 0:
+            if abs(p.imag) > 1e-15:
                 raise ValueError(f"Complex probability: {p}")
             probs[i] = p.real
 

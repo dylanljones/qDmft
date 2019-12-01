@@ -10,21 +10,9 @@ import numpy as np
 from scipy.linalg import expm
 from qsim.core import *
 from qsim import Circuit, Gate
+from qsim.twosite import gf_lesser, gf_greater, plot_measurement
 
 si, sx, sy, sz = pauli
-
-
-def plot_measurement(data, dtau):
-    n = len(data)
-    tau = np.arange(n) * dtau
-    plot = Plot(xlim=[0, np.max(tau)], ylim=[-1, 1])
-    plot.set_labels(r"$\tau t^*$", r"$G_{imp}^{R}(\tau)$")
-    plot.grid()
-    plot.set_title(f"N={n-1}")
-    plot.plot(tau, data.real, label="real")
-    plot.plot(tau, data.imag, label="imag")
-    plot.legend()
-    plot.show()
 
 
 def time_evolution_circuit(c, v, step, dtau, u=4):
@@ -38,17 +26,17 @@ def time_evolution_circuit(c, v, step, dtau, u=4):
 
 def measurement(s, v, step, dtau, alpha, beta, n=500):
     c = Circuit(5, 1)
-    c.init(s)
+    c.state.set(s)
     c.h(0)
     c.add_gate(f"c{alpha.upper()}", 1, con=0, trigger=0)
-    # time_evolution_circuit(c, v, step, dtau)
+    time_evolution_circuit(c, v, step, dtau)
     c.add_gate(f"c{beta.upper()}", 1, con=0, trigger=1)
     c.h(0)
 
     c.run_shot()
     data = np.zeros(n, "complex")
     for i in range(n):
-        data[i] = c.state.measure_qubit(c.qubits[0], basis=sy, shadow=True)
+        data[i] = c.state.measure_y(c.qubits[0], shadow=True)[0]
     return np.mean(data)
 
 
@@ -63,7 +51,7 @@ def measure_gf_greater(s, v, step, dtau, verbose=False):
         print("yx", g2)
         print("xy", g3)
         print("yy", g4)
-    return -0.25j * (g1 + 1j*g2 - 1j*g3 + g4)
+    return gf_greater(g1, g2, g3, g4)
 
 
 def measure_gf_lesser(s, v, step, dtau, verbose=False):
@@ -77,7 +65,7 @@ def measure_gf_lesser(s, v, step, dtau, verbose=False):
         print("xy", g2)
         print("yx", g3)
         print("yy", g4)
-    return 0.25j * (g1 - 1j*g2 + 1j*g3 + g4)
+    return gf_lesser(g1, g2, g3, g4)
 
 
 def measure_gf(s0, v, n, dtau, verbose=True):
@@ -87,18 +75,17 @@ def measure_gf(s0, v, n, dtau, verbose=True):
         gf_g = measure_gf_greater(s0, v, step, dtau, verbose)
         gf_l = measure_gf_lesser(s0, v, step, dtau, verbose)
         data[step] = gf_g - gf_l
-    return data
+    return np.abs(data)
 
 
 def main():
     u, t, v = 4, 1, 1
-    tau_max, n = 6, 6
+    tau_max, n = 6, 12
     dtau = tau_max / n
 
     s0 = np.load("state.npy")
-    data = measure_gf(s0, v, n, dtau)
+    data = measure_gf(s0, v, n, dtau, verbose=False)
     plot_measurement(data, dtau)
-
 
 
 if __name__ == "__main__":
