@@ -159,6 +159,19 @@ def b_gatefunc(qubits, n, arg):
     return gate
 
 
+def c_gatefunc(qubit, n, arg):
+    sigma = single_gate(qubit, Z_GATE, n)
+    gate = expm(1j * sigma * arg)
+    return gate
+
+
+def d_gatefunc(qubit, n, arg):
+    sigma = single_gate(qubit, Z_GATE, n)
+    gate = expm(-1j * sigma * arg)
+    return gate
+
+
+
 # =========================================================================
 
 
@@ -172,5 +185,5 @@ def swap_single_cgate(gate):
 GATE_DICT = {"i": id_gate, "x": x_gate, "y": y_gate, "z": z_gate,
              "h": h_gate, "s": s_gate, "t": t_gate,
              "rx": rx_gate, "ry": ry_gate, "rz": rz_gate,
-             "xy": xy_gatefunc, "b": b_gatefunc
+             "xy": xy_gatefunc, "b": b_gatefunc, "d": b_gatefunc, "c": c_gatefunc
              }

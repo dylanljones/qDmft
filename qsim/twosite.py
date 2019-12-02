@@ -29,3 +29,7 @@ def gf_greater(xx, yx, xy, yy):
 
 def gf_lesser(xx, xy, yx, yy):
     return +0.25j * (xx - 1j*xy + 1j*yx + yy)
+
+
+def gf_fit(t, alpha_1, alpha_2, omega_1, omega_2):
+    return 2 * (alpha_1 * np.cos(omega_1 * t) + alpha_2*np.cos(omega_2 * t))

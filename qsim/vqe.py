@@ -16,7 +16,7 @@ class VqeResult(optimize.OptimizeResult):
 
     def __init__(self, sol, gs_ref=0):
         super().__init__(x=sol.x, success=sol.success, message=sol.message,
-                         nfev=sol.nfev, njev=sol.njev, nit=sol.nit)
+                         nfev=sol.nfev, nit=sol.nit)
         self.gs_ref = gs_ref
         self.gs = sol.fun
 
@@ -30,8 +30,9 @@ class VqeResult(optimize.OptimizeResult):
             popt_str += ", ..."
         lines = list()
         lines.append(f"Message: {self.message}")
-        lines.append(f"Evals:   nfev={self.nfev}, njev={self.njev}, nit={self.nit}")
+        lines.append(f"Evals:   nfev={self.nfev}, nit={self.nit}")
         lines.append(f"Value:   {self.gs_ref:.{d}}")
+        lines.append(f"Result:  {self.gs}")
         lines.append(f"Error:   {self.error:.{d}}")
         lines.append(f"Popt:    {popt_str}")
 
@@ -90,12 +91,12 @@ class VqeSolver:
             return self.expectation(self.res.x)
         return None
 
-    def solve(self, x0=None, tol=1e-10, verbose=False):
+    def solve(self, x0=None, verbose=False, **kwargs):
         if verbose:
             print("Optimizing Vqe circuit:")
         if x0 is None:
             x0 = np.random.uniform(0, 2 * np.pi, size=self.circuit.n_params)
-        sol = optimize.minimize(self.expectation, x0=x0, tol=tol)
+        sol = optimize.minimize(self.expectation, x0=x0, **kwargs)
         res = VqeResult(sol, self.gs_ref)
         self.res = res
         if verbose:

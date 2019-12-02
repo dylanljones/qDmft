@@ -9,17 +9,17 @@ version: 0.1
 import numpy as np
 from scipy.linalg import expm
 import scipy.linalg as la
+from scitools import Plot
 from qsim.core import *
 from qsim import Circuit, Gate
+from qsim.twosite import gf_fit
 
 si, sx, sy, sz = pauli
 
 
 def main():
-    c = Circuit(2, 2)
-    c.my()
-    res = c.run(1000, state0=kron(ONE, ZERO))
-    print(np.mean(res, axis=0))
+    d = d_gatefunc(0, 2, 1)
+    print(d)
 
 
 if __name__ == "__main__":

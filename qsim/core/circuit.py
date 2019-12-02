@@ -292,11 +292,8 @@ class Circuit:
 
     # =========================================================================
 
-    # def state(self):
-    #    return self.state.state()
-
     def expectation(self, operator):
-        return self.state.expectation(operator)  # expectation(operator, self.state())
+        return self.state.expectation(operator)
 
     def measure(self, qubits, basis=None):
         qubits = self.qureg.list(qubits)
@@ -317,25 +314,6 @@ class Circuit:
                     data[idx] = x
         return data
 
-    def run2(self, shots=1, verbose=False, *args, **kwargs):
-        terminal = Terminal()
-        header = "Running experiment"
-        if verbose:
-            terminal.write(header)
-
-        data = np.zeros((shots, self.n_clbits), dtype="complex")
-        for i in range(shots):
-            data[i] = self.run_shot()
-            if verbose:
-                terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
-        self.res = Result(data)
-        if verbose:
-            terminal.writeln()
-            val, p = self.res.expected()
-            state = self.basis.labels[val]
-            terminal.writeln(f"Result: {val} ({state}, p={p:.2f})")
-        return self.res
-
     def run(self, shots=1, verbose=False, state0=None, *args, **kwargs):
         terminal = Terminal()
         header = "Running experiment"
@@ -352,23 +330,6 @@ class Circuit:
             terminal.writeln(f"Result: {np.mean(data, axis=0)}")
         return data
 
-    def simulate_expectation(self, qubit, shots=1000, basis=None, verbose=False, *args, **kwargs):
-        qubit = self.qureg.list(qubit)[0]
-        terminal = Terminal()
-        header = "Simulating expectation value"
-        if verbose:
-            terminal.write(header)
-        data = np.zeros((shots, self.n_clbits), dtype="complex")
-        for i in range(shots):
-            self.run_shot()
-            data[i] = self.state.measure_qubit(qubit, basis)
-            if verbose:
-                terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
-        result = np.mean(data).real
-        if verbose:
-            terminal.writeln()
-            terminal.writeln(f"Result: {result:.3}")
-        return result
 
     def histogram(self):
         return self.res.hist
