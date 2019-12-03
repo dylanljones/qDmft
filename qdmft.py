@@ -6,8 +6,6 @@ author: Dylan Jones
 project: qsim
 version: 0.1
 """
-import numpy as np
-from scipy.linalg import expm
 from scitools import Terminal
 from qsim.core import *
 from qsim import Circuit, VqeSolver
@@ -87,6 +85,7 @@ def prepare_groundstate(file, u=4, v=1, eps=None, mu=None):
     print(sol)
     if sol.error <= 1e-10:
         vqe.save_state(file)
+    return vqe.circuit.state.amp
 
 
 # =========================================================================
@@ -122,42 +121,30 @@ def measurement(s, u, v, step, dtau, alpha, beta, n=None):
     return x
 
 
-def measure_gf_greater(s, u, v, step, dtau, n=None, verbose=False):
+def measure_gf_greater(s, u, v, step, dtau, n=None):
     g1 = measurement(s, u, v, step, dtau, "x", "x", n)
     g2 = measurement(s, u, v, step, dtau, "y", "x", n)
     g3 = measurement(s, u, v, step, dtau, "x", "y", n)
     g4 = measurement(s, u, v, step, dtau, "y", "y", n)
-    if verbose:
-        print("Greater")
-        print("xx", g1)
-        print("yx", g2)
-        print("xy", g3)
-        print("yy", g4)
     return gf_greater(g1, g2, g3, g4)
 
 
-def measure_gf_lesser(s, u, v, step, dtau, n=None, verbose=False):
+def measure_gf_lesser(s, u, v, step, dtau, n=None):
     g1 = measurement(s, u, v, step, dtau, "x", "x", n)
     g2 = measurement(s, u, v, step, dtau, "x", "y", n)
     g3 = measurement(s, u, v, step, dtau, "y", "x", n)
     g4 = measurement(s, u, v, step, dtau, "y", "y", n)
-    if verbose:
-        print("Lesser")
-        print("xx", g1)
-        print("xy", g2)
-        print("yx", g3)
-        print("yy", g4)
     return gf_lesser(g1, g2, g3, g4)
 
 
-def measure_gf(s0, u, v, n, dtau, shots=None, verbose=True):
+def measure_gf(s0, u, v, n, dtau, shots=None):
     data = np.zeros(n+1, "complex")
     terminal = Terminal()
     terminal.write("Measuring Green's function")
     for step in range(n+1):
         terminal.updateln(f"Measuring Green's function: {step}/{n}")
-        gf_g = measure_gf_greater(s0, u, v, step, dtau, shots, verbose)
-        gf_l = measure_gf_lesser(s0, u, v, step, dtau, shots, verbose)
+        gf_g = measure_gf_greater(s0, u, v, step, dtau, shots)
+        gf_l = measure_gf_lesser(s0, u, v, step, dtau, shots)
         data[step] = gf_g - gf_l
     terminal.writeln()
     tau = np.arange(len(data)) * dtau
@@ -183,7 +170,7 @@ def measure_greens(gs, u, v, tau_max, n):
     dtau = tau_max / n
 
     gs = kron(ZERO, gs)
-    tau, data = measure_gf(gs, u, v, n, dtau, shots=None, verbose=False)
+    tau, data = measure_gf(gs, u, v, n, dtau, shots=None)
 
     popt, errs = fit_gf_measurement(tau, data.real, p0=[0.1, 0.4, 1, 2.5])
     print_popt(popt)
@@ -201,7 +188,7 @@ def main():
     u, t, v = 4, 1, 1
     tau_max, n = 6, 24
 
-    prepare_groundstate(STATE_FILE, u, v)
+    # gs = prepare_groundstate(STATE_FILE, u, v)
     gs = np.load(STATE_FILE)
     measure_greens(gs, u, v, tau_max, n)
 

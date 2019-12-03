@@ -22,8 +22,9 @@ def gf_fit(t, alpha_1, alpha_2, omega_1, omega_2):
     return 2 * (alpha_1 * np.cos(omega_1 * t) + alpha_2 * np.cos(omega_2 * t))
 
 
-def fit_gf_measurement(t, data, p0=None):
-    popt, pcov = optimize.curve_fit(gf_fit, t, data, p0=p0)
+def fit_gf_measurement(t, data, p0=None, alpha_max=1, omega_max=100):
+    bounds = (0, [alpha_max, alpha_max, omega_max, omega_max])
+    popt, pcov = optimize.curve_fit(gf_fit, t, data, p0=p0, bounds=bounds)
     errs = np.sqrt(np.diag(pcov))
     return popt, errs
 
