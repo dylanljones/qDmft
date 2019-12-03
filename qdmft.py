@@ -15,8 +15,7 @@ from qsim.twosite import *
 
 si, sx, sy, sz = pauli
 
-STATE_FILE = "siam4.sv.npy"
-STATE_FILE2 = "siam_2.sv.npy"
+STATE_FILE = "siam_gs.npy"
 
 
 def plot_measurement(tau, data, fit=None):
@@ -202,7 +201,7 @@ def main():
     u, t, v = 4, 1, 1
     tau_max, n = 6, 24
 
-    # prepare_groundstate(STATE_FILE, u, v)
+    prepare_groundstate(STATE_FILE, u, v)
     gs = np.load(STATE_FILE)
     measure_greens(gs, u, v, tau_max, n)
 
