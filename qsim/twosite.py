@@ -7,20 +7,7 @@ project: qsim
 version: 1.0
 """
 import numpy as np
-from scitools import Plot
-
-
-def plot_measurement(data, dtau):
-    n = len(data)
-    tau = np.arange(n) * dtau
-    plot = Plot(xlim=[0, np.max(tau)], ylim=[-1, 1])
-    plot.set_labels(r"$\tau t^*$", r"$G_{imp}^{R}(\tau)$")
-    plot.grid()
-    plot.set_title(f"N={n-1}")
-    plot.plot(tau, data.real, label="real")
-    plot.plot(tau, data.imag, label="imag")
-    plot.legend()
-    plot.show()
+from scipy import optimize
 
 
 def gf_greater(xx, yx, xy, yy):
@@ -32,4 +19,24 @@ def gf_lesser(xx, xy, yx, yy):
 
 
 def gf_fit(t, alpha_1, alpha_2, omega_1, omega_2):
-    return 2 * (alpha_1 * np.cos(omega_1 * t) + alpha_2*np.cos(omega_2 * t))
+    return 2 * (alpha_1 * np.cos(omega_1 * t) + alpha_2 * np.cos(omega_2 * t))
+
+
+def fit_gf_measurement(t, data, p0=None):
+    popt, pcov = optimize.curve_fit(gf_fit, t, data, p0=p0)
+    errs = np.sqrt(np.diag(pcov))
+    return popt, errs
+
+
+def fitted_gf(t_fit, popt):
+    return gf_fit(t_fit, *popt)
+
+
+def gf_spectral(z, alpha_1, alpha_2, omega_1, omega_2):
+    t1 = alpha_1 * (1 / (z + omega_1) + 1 / (z - omega_1))
+    t2 = alpha_2 * (1 / (z + omega_2) + 1 / (z - omega_2))
+    return t1 + t2
+
+
+def fitted_gf_spectral(z, popt):
+    return gf_spectral(z, *popt)

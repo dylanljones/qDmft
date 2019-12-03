@@ -66,9 +66,9 @@ class StateVector:
         state = kron([ZERO] * self.n_qubits) if amp is None else np.copy(amp)
         if len(state) != self.n:
             raise ValueError(f"Dimensions dont't match: {len(state)} != {self.n}")
-        if np.round(la.norm(state), decimals=15) != 1.0:
+        if np.round(la.norm(state), decimals=10) != 1.0:
             raise ValueError(f"State not normalized: |s|={np.round(la.norm(state), decimals=15)}")
-        self.amp = state
+        self.amp = state / la.norm(state)
 
     def prepare(self, *states):
         amp = kron(*states)
@@ -135,13 +135,33 @@ class StateVector:
     def histogram(self):
         return np.arange(self.n), np.abs(self.amp)
 
-    def expectation(self, op):
-        return expectation(op, self.amp)
-
     def project(self, idx, op):
         parts = [np.eye(2)] * self.n_qubits
         parts[idx] = op
         return np.dot(kron(parts), self.amp)
+
+    def expectation(self, op, qubit=None):
+        r""" Calculates the expectation value of a given operator.
+
+        .. math::
+            x = <\Psi| \hat{O} |\Psi>
+
+        Parameters
+        ----------
+        op: np.ndarray
+            The exectation of this operator is caluclated
+        qubit: Qubit, optional
+            Qubit if the operator is a single-qubit operator.
+
+        Returns
+        -------
+        x: float
+        """
+        if qubit is not None and op.shape == (2, 2):
+            parts = [np.eye(2)] * self.n_qubits
+            parts[qubit.index] = op
+            op = kron(parts)
+        return expectation(op, self.amp)
 
     def apply_unitary(self, u):
         r""" Apply unitary operator to teh statevector.

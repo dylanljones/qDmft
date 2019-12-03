@@ -14,27 +14,31 @@ from qsim.core.circuit import Circuit
 
 class VqeResult(optimize.OptimizeResult):
 
-    def __init__(self, sol, gs_ref=0):
+    def __init__(self, sol, exact=0):
         super().__init__(x=sol.x, success=sol.success, message=sol.message,
                          nfev=sol.nfev, nit=sol.nit)
-        self.gs_ref = gs_ref
-        self.gs = sol.fun
+        self.exact = exact
+        self.value = sol.fun
 
     @property
     def error(self):
-        return abs(self.gs - self.gs_ref)
+        return abs(self.value - self.exact)
+
+    @property
+    def rel_error(self):
+        return abs((self.value - self.exact) / self.exact)
 
     def string(self, d=5, maxvals=10):
         popt_str = ", ".join([f"{x:.{d}}" for x in self.x[:maxvals]])
         if len(self.x) > maxvals:
             popt_str += ", ..."
         lines = list()
+        lines.append(f"Success: {self.success} (nfev={self.nfev}, nit={self.nit})")
         lines.append(f"Message: {self.message}")
-        lines.append(f"Evals:   nfev={self.nfev}, nit={self.nit}")
-        lines.append(f"Value:   {self.gs_ref:.{d}}")
-        lines.append(f"Result:  {self.gs}")
-        lines.append(f"Error:   {self.error:.{d}}")
-        lines.append(f"Popt:    {popt_str}")
+        lines.append(f"x:       {popt_str}")
+        lines.append(f"Exact:   {self.exact:.{d}}")
+        lines.append(f"Result:  {self.value}")
+        lines.append(f"Error:   {self.error:.{d}} ({100 * self.rel_error:.2f}%)")
 
         line = "-" * (max([len(x) for x in lines]) + 1)
         string = "\n".join(lines)
@@ -48,32 +52,46 @@ class VqeSolver:
 
     def __init__(self, ham, num_clbits=None):
         self.ham = None
-        self.gs_ref = 0
+        self.exact = 0
         self.circuit = None
-        self.res = None
-        self.init(ham, num_clbits)
+        self.sol = None
 
-    def init(self, ham, num_clbits=None):
+        self.setup(ham, num_clbits)
+
+    def setup(self, ham, num_clbits=None):
+        # Calculate exact groundstate
+        eigvals, eigstates = np.linalg.eig(ham)
+        gs = np.min(eigvals).real
+
+        # Setup vqe-circuit
         num_qubits = int(np.log2(ham.shape[0]))
-        eigvals, eigstates = la.eigh(ham)
-        gs = np.min(eigvals)
+        circuit = Circuit(num_qubits, num_clbits)
+
         self.ham = ham
-        self.gs_ref = gs
-        self.circuit = Circuit(num_qubits, num_clbits)
-        self.res = None
+        self.exact = gs
+        self.circuit = circuit
+        self.sol = None
+
+    @property
+    def n_params(self):
+        return self.circuit.n_params
 
     @property
     def success(self):
-        return self.res.success
+        return self.sol is not None and self.sol.success
 
     @property
-    def popt(self):
-        return self.res.x
+    def atol(self):
+        return abs(self.exact - self.circuit.expectation(self.ham))
+
+    @property
+    def x(self):
+        return self.sol.x
 
     def __str__(self):
         string = "VQE-Solver:"
-        if self.res is not None:
-            string += "\n" + str(self.res)
+        if self.sol is not None:
+            string += "\n" + str(self.sol)
         else:
             string += " Ready!"
         return string
@@ -86,51 +104,18 @@ class VqeSolver:
         self.circuit.run_shot()
         return self.circuit.expectation(self.ham)
 
-    def eigval(self):
-        if self.success:
-            return self.expectation(self.res.x)
-        return None
-
-    def solve(self, x0=None, verbose=False, **kwargs):
-        if verbose:
-            print("Optimizing Vqe circuit:")
+    def minimize(self, x0=None, **kwargs):
         if x0 is None:
-            x0 = np.random.uniform(0, 2 * np.pi, size=self.circuit.n_params)
+            x0 = np.random.uniform(0, np.pi, size=self.n_params)
         sol = optimize.minimize(self.expectation, x0=x0, **kwargs)
-        res = VqeResult(sol, self.gs_ref)
-        self.res = res
-        if verbose:
-            print(res)
-        return res
+        self.sol = VqeResult(sol, self.exact)
+        return self.sol
 
-    def save(self, name):
+    def check(self, atol=1e-2):
+        return self.atol <= atol
+
+    def save_circuit(self, name):
         return self.circuit.save(name + ".circ")
 
-
-def prepare_ground_state(ham, circuit_config, file="",x0=None, new=False, clbits=1, verbose=True):
-    if file and not new:
-        try:
-            c = Circuit.load(file)
-            if verbose:
-                print(f"Circuit: {file} loaded!")
-            return c
-        except FileNotFoundError:
-            print(f"No file {file} found.")
-    vqe = VqeSolver(ham, clbits)
-    circuit_config(vqe)
-    vqe.solve(x0=x0, verbose=verbose)
-    if file:
-        file = vqe.save(file)
-        if verbose:
-            print(f"Saving circuit: {file}")
-    return vqe.circuit
-
-
-def test_vqe(c, ham, dec=5):
-    eigvals, eigstates = la.eigh(ham)
-    gs_ref = np.min(eigvals)
-    c.run_shot()
-    gs = c.expectation(ham)
-    print(f"Ground state:    {gs_ref:.{dec}}")
-    print(f"VQE-Preperation: {gs:.{dec}}")
-    print(f"Error:           {abs(gs_ref-gs):.3}")
+    def save_state(self, name):
+        self.circuit.save_state(name)

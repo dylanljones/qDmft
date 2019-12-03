@@ -334,18 +334,6 @@ class Gate(Instruction):
         func = self._get_gatefunc(self.name)
         return func(arg)
 
-    def _build_single_gate(self, n_qubits):
-        indices = self.qu_indices
-        eye = np.eye(2)
-        arrs = list()
-        for qbit in range(n_qubits):
-            part = eye
-            if qbit in indices:
-                idx = indices.index(qbit)
-                part = self._qubit_gate_matrix(idx)
-            arrs.append(part)
-        return kron(arrs)
-
     def build_matrix(self, n_qubits):
         if self.is_controlled:
             name = self.name.replace("c", "")

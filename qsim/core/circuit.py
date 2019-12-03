@@ -72,8 +72,19 @@ class Circuit:
     def args(self):
         return self.pmap.args
 
+    @property
+    def statevector(self):
+        return self.state.amp
+
+    def save_state(self, name):
+        return np.save(name, self.state.amp)
+
     def set_state(self, psi):
         self.state.set(psi)
+
+    def load_state(self, name):
+        state = np.load(name)
+        self.set_state(state)
 
     def init_params(self, *args):
         self.pmap.init(*args)
@@ -292,8 +303,10 @@ class Circuit:
 
     # =========================================================================
 
-    def expectation(self, operator):
-        return self.state.expectation(operator)
+    def expectation(self, operator, qubit=None):
+        if qubit is not None:
+            qubit = self.qureg.list(qubit)[0]
+        return self.state.expectation(operator, qubit)
 
     def measure(self, qubits, basis=None):
         qubits = self.qureg.list(qubits)
@@ -302,7 +315,8 @@ class Circuit:
     def apply_gate(self, inst):
         self.state.apply_gate(inst)
 
-    def run_shot(self):
+    def run_shot(self, state=None):
+        self.init(state)
         data = np.zeros(self.n_clbits, dtype="float")
         for inst in self.instructions:
             if isinstance(inst, Gate):
@@ -314,22 +328,20 @@ class Circuit:
                     data[idx] = x
         return data
 
-    def run(self, shots=1, verbose=False, state0=None, *args, **kwargs):
+    def run(self, shots=1, verbose=False, state=None):
         terminal = Terminal()
         header = "Running experiment"
         if verbose:
             terminal.write(header)
         data = np.zeros((shots, self.n_clbits), dtype="float")
         for i in range(shots):
-            self.init(state0)
-            data[i] = self.run_shot()
+            data[i] = self.run_shot(state)
             if verbose:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
         if verbose:
             terminal.writeln()
             terminal.writeln(f"Result: {np.mean(data, axis=0)}")
         return data
-
 
     def histogram(self):
         return self.res.hist

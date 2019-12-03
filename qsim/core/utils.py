@@ -54,7 +54,7 @@ def get_projector(v):
 
 
 def expectation(op, v):
-    return np.dot(np.conj(v).T, op.dot(v))
+    return np.dot(np.conj(v).T, op.dot(v)).real
 
 
 def binstr(x, n=None):
