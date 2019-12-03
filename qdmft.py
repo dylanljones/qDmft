@@ -185,7 +185,8 @@ def measure_greens(gs, u, v, tau_max, n):
 
 
 def main():
-    u, t, v = 4, 1, 1
+    u, t = 4, 1
+    v = t  # t
     tau_max, n = 6, 24
 
     # gs = prepare_groundstate(STATE_FILE, u, v)
