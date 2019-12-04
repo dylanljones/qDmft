@@ -6,10 +6,13 @@ author: Dylan Jones
 project: qsim
 version: 0.1
 """
+import numpy as np
+import numpy.linalg as la
 from scitools import Terminal
 from qsim.core import *
 from qsim import Circuit, VqeSolver
 from qsim.twosite import *
+from dmft import *
 
 si, sx, sy, sz = pauli
 
@@ -31,12 +34,13 @@ def plot_measurement(tau, data, fit=None):
 
 def plot_all(tau, data, t_fit, fit, z, gf):
     plot = Plot.subplots(2, 1)
+    plot.set_figsize(width=800)
     plot.add_gridsubplot(0)
     plot.set_limits((0, np.max(tau)), (-1.05, 1.05))
     plot.set_labels(r"$\tau t^*$", r"$G_{imp}^{R}(\tau)$")
     plot.plot(tau, data.real, label="real", color="k")
     plot.plot(tau, data.imag, label="imag", lw=0.5)
-    plot.plot(t_fit, fit, color="r", label="Fit", ls="--")
+    plot.plot(t_fit, fit, color="r", label="Fit", ls="--", lw=1.0)
     plot.legend()
     plot.grid()
 
@@ -73,6 +77,7 @@ def config_vqe_circuit(c):
 
 
 def prepare_groundstate(file, u=4, v=1, eps=None, mu=None):
+    print("Preparing ground-state")
     if eps is None:
         eps = u/2
     if mu is None:
@@ -86,69 +91,6 @@ def prepare_groundstate(file, u=4, v=1, eps=None, mu=None):
     if sol.error <= 1e-10:
         vqe.save_state(file)
     return vqe.circuit.state.amp
-
-
-# =========================================================================
-#                               MEASUREMENT
-# =========================================================================
-
-
-def time_evolution_circuit(circ, u, v, step, dtau):
-    b_arg = u * dtau / 4
-    xy_arg = v * dtau / 2
-    for i in range(step):
-        circ.xy([[1, 2], [3, 4]], xy_arg)
-        circ.b([1, 3], b_arg)
-
-
-def measurement(s, u, v, step, dtau, alpha, beta, n=None):
-    c = Circuit(5, 1)
-    c.state.set(s)
-    c.h(0)
-    c.add_gate(f"c{alpha.upper()}", 1, con=0, trigger=0)
-    time_evolution_circuit(c, u, v, step, dtau)
-    c.add_gate(f"c{beta.upper()}", 1, con=0, trigger=1)
-    c.h(0)
-
-    c.run_shot()
-    if n is None:
-        x = c.expectation(sy, 0)
-    else:
-        data = np.zeros(n, "complex")
-        for i in range(n):
-            data[i] = c.state.measure_y(c.qubits[0], shadow=True)[0]
-        x = np.mean(data)
-    return x
-
-
-def measure_gf_greater(s, u, v, step, dtau, n=None):
-    g1 = measurement(s, u, v, step, dtau, "x", "x", n)
-    g2 = measurement(s, u, v, step, dtau, "y", "x", n)
-    g3 = measurement(s, u, v, step, dtau, "x", "y", n)
-    g4 = measurement(s, u, v, step, dtau, "y", "y", n)
-    return gf_greater(g1, g2, g3, g4)
-
-
-def measure_gf_lesser(s, u, v, step, dtau, n=None):
-    g1 = measurement(s, u, v, step, dtau, "x", "x", n)
-    g2 = measurement(s, u, v, step, dtau, "x", "y", n)
-    g3 = measurement(s, u, v, step, dtau, "y", "x", n)
-    g4 = measurement(s, u, v, step, dtau, "y", "y", n)
-    return gf_lesser(g1, g2, g3, g4)
-
-
-def measure_gf(s0, u, v, n, dtau, shots=None):
-    data = np.zeros(n+1, "complex")
-    terminal = Terminal()
-    terminal.write("Measuring Green's function")
-    for step in range(n+1):
-        terminal.updateln(f"Measuring Green's function: {step}/{n}")
-        gf_g = measure_gf_greater(s0, u, v, step, dtau, shots)
-        gf_l = measure_gf_lesser(s0, u, v, step, dtau, shots)
-        data[step] = gf_g - gf_l
-    terminal.writeln()
-    tau = np.arange(len(data)) * dtau
-    return tau, data
 
 
 # =========================================================================
@@ -166,32 +108,65 @@ def print_popt(popt, dec=2):
     print(line)
 
 
-def measure_greens(gs, u, v, tau_max, n):
-    dtau = tau_max / n
-
+def plot_measurement(siam, gs, tmax, nt):
+    dt = tmax / nt
     gs = kron(ZERO, gs)
-    tau, data = measure_gf(gs, u, v, n, dtau, shots=None)
-
-    popt, errs = fit_gf_measurement(tau, data.real, p0=[0.1, 0.4, 1, 2.5])
+    times, data = measure_gf(gs, siam.u, siam.v, nt, dt, imag=True, shots=None)
+    popt, errs = fit_gf_measurement(times, data.real, p0=[0.1, 0.4, 1, 2.5])
     print_popt(popt)
-    t_fit = np.linspace(0, tau_max, 100)
-    fit = fitted_gf(t_fit, popt)
-    z = np.linspace(-6, 6, 1000) + 0.01j
-    gf = fitted_gf_spectral(z, popt)
+    t_fit, fit = get_gf_fit_data(popt, tmax, n=100)
+    z, gf = get_gf_spectral_data(popt, 6, n=1000)
 
-    # Plotting
-    plot_all(tau, data, t_fit, fit, z, gf)
-    # plot_measurement(tau, data, fit)
+    plot_all(times, data, t_fit, fit, z, gf)
+
 
 
 def main():
     u, t = 4, 1
-    v = t  # t
-    tau_max, n = 6, 24
+    tmax, nt = 6, 24
+    omax = 4
+    omegas = np.linspace(-omax, omax, 10000)
+    z = omegas + 0.01j
+    p0 = [0.1, 0.4, 1, 2.5]
+
+    siam = TwoSiteSiam.half_filling(u=u, v=t)
+    m2 = m2_weight(t)
 
     # gs = prepare_groundstate(STATE_FILE, u, v)
     gs = np.load(STATE_FILE)
-    measure_greens(gs, u, v, tau_max, n)
+
+    gf = measure_gf_spectral(siam, gs, tmax, nt, z, p0)
+    gf_ref = impurity_gf_ref(z, siam.u, siam.v)
+
+    plot = Plot()
+    plot.plot(z.real, -gf.imag, label="Measured")
+    plot.plot(z.real, -gf_ref.imag, label="Exact")
+    plot.legend()
+    plot.show()
+
+
+    return
+    gf_0 = impurity_gf_free_ref(z, siam.eps_imp, siam.eps_bath, siam.v)
+    sigma = self_energy(gf_0, gf)
+
+    qp = quasiparticle_weight(z.real, sigma)
+    v_new = new_hybridization(qp, m2, siam.v)
+    print(v_new)
+
+    plot = Plot(xlabel=r"$\omega$")
+    plot.grid()
+    plot.plot(z.real, -sigma.imag, color="k", label=r"-Im $\Sigma_{imp}(z)$")
+    plot.plot(z.real, -gf_0.imag, label=r"-Im $G_{imp}^{0}(z)$")
+    plot.plot(z.real, -gf.imag, label=r"-Im $G_{imp}(z)$")
+
+    plot.set_limits(0)
+    plot.legend()
+
+    plot.show()
+
+
+
+
 
 
 if __name__ == "__main__":

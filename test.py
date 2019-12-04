@@ -7,26 +7,27 @@ project: qsim
 version: 0.1
 """
 import numpy as np
-from scipy.linalg import expm
-import scipy.linalg as la
 from scitools import Plot
-from qsim.core import *
-from qsim import Circuit, Gate
-from qsim.twosite import gf_fit, gf_spectral
-
-si, sx, sy, sz = pauli
-omega_1 = 4.033
-omega_2 = 5.197
-alpha_1 = 0.242
-alpha_2 = 0.207
-
-
-def test_fft():
-    c = Circuit(5)
+from dmft.twosite import *
+from dmft import TwoSiteSiam
 
 
 def main():
-    test_fft()
+    u, t = 4, 1
+    z = np.linspace(-5, 5, 1000) + 0.01j
+    m2 = m2_weight(t)
+
+    siam = TwoSiteSiam.half_filling(u=u, v=t)
+
+    gf = impurity_gf_ref(z, siam.u, siam.v)
+    gf0 = siam.impurity_gf_free(z)
+    sigma = self_energy(gf0, gf)
+
+    plot = Plot()
+    plot.plot(z.real, -gf.imag)
+    plot.plot(z.real, -gf0.imag)
+    plot.plot(z.real, -sigma.imag, color="k")
+    plot.show()
 
 
 if __name__ == "__main__":
