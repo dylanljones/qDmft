@@ -40,7 +40,6 @@ def impurity_gf_ref(z, u, v):
 # ===================================================================================
 
 
-
 def self_energy(gf_imp0, gf_imp):
     return 1/gf_imp0 - 1/gf_imp
 
@@ -154,5 +153,3 @@ class TwoSiteSiam:
     def impurity_gf_free(self, z):
         return 1/(z + self.mu - self.eps_imp - self.hybridization(z))
 
-    def new_hybridization():
-        pass

@@ -22,47 +22,102 @@ PHASE_GATE = np.array([[1, 0], [0, 1j]])
 T_GATE = np.array([[1, 0], [0, np.exp(1j*np.pi/4)]])
 
 
-def id_gate(args=None):
+def id_gate(*args):
+    """ Functional for the single-qubit identity gate """
     return np.eye(2)
 
 
-def x_gate(args=None):
+def x_gate(*args):
+    """ Functional for the single-qubit Pauli-X gate """
     return X_GATE
 
 
-def y_gate(args=None):
+def y_gate(*args):
+    """ Functional for the single-qubit Pauli-Y gate """
     return Y_GATE
 
 
-def z_gate(args=None):
+def z_gate(*args):
+    """ Functional for the single-qubit Pauli-Z gate """
     return Z_GATE
 
 
-def h_gate(args=None):
+def h_gate(*args):
+    """ Functional for the single-qubit Hadamard (H) gate """
     return HADAMARD_GATE
 
 
-def s_gate(args=None):
+def s_gate(*args):
+    """ Functional for the single-qubit phase (S) gate """
     return PHASE_GATE
 
 
-def t_gate(args=None):
+def t_gate(*args):
+    """ Functional for the single-qubit T gate """
     return T_GATE
 
 
 def rx_gate(phi=0):
+    """ Functional for the single-qubit Pauli-X rotation-gate
+
+    Parameters
+    ----------
+    phi: float
+        Rotation angle (in radians)
+
+    Returns
+    -------
+    rx: (2, 2) np.ndarray
+    """
     arg = phi / 2
     return np.array([[np.cos(arg), -1j*np.sin(arg)], [-1j*np.sin(arg), np.cos(arg)]])
 
 
 def ry_gate(phi=0):
+    """ Functional for the single-qubit Pauli-Y rotation-gate
+
+    Parameters
+    ----------
+    phi: float
+        Rotation angle (in radians)
+
+    Returns
+    -------
+    ry: (2, 2) np.ndarray
+    """
     arg = phi / 2
     return np.array([[np.cos(arg), -np.sin(arg)], [+np.sin(arg), np.cos(arg)]])
 
 
 def rz_gate(phi=0):
+    """ Functional for the single-qubit Pauli-Z rotation-gate
+
+    Parameters
+    ----------
+    phi: float
+        Rotation angle (in radians)
+
+    Returns
+    -------
+    rz: (2, 2) np.ndarray
+    """
     arg = 1j * phi / 2
     return np.array([[np.exp(-arg), 0], [0, np.exp(arg)]])
+
+
+def exp_gate(a):
+    """ Matrix exponential for custom gates
+
+    Parameters
+    ----------
+    a: (N, N) array_like
+        Argument of the matrix-exponential function.
+
+    Returns
+    -------
+    g: (N, N) np.ndarray
+    """
+    return expm(a)
 
 
 # =========================================================================
@@ -101,7 +156,7 @@ def single_gate(qbits, gates, n=None):
     return kron(arrs)
 
 
-def get_projection(*items, n):
+def _get_projection(*items, n):
     parts = [np.eye(2)] * n
     for idx, proj in items:
         parts[idx] = proj
@@ -142,8 +197,11 @@ def cgate(con, t, gate, n=None, trigger=1):
             # Projection with applying gate
             items.append((t, gate))
         # Build projection array and add to matrix
-        array = array + kron(get_projection(*items, n=n))
+        array = array + kron(_get_projection(*items, n=n))
     return array
+
+
+# =========================================================================
 
 
 def xy_gatefunc(qubits, n, arg):
@@ -151,6 +209,9 @@ def xy_gatefunc(qubits, n, arg):
     notc = cgate(q2, q1, X_GATE, n)
     crx = cgate(q1, q2, rx_gate(4*arg), n)
     return np.dot(notc, crx.dot(notc))
+    # xx = single_gate(qubits, [X_GATE, X_GATE], n)
+    # yy = single_gate(qubits, [Y_GATE, Y_GATE], n)
+    # return expm(-1j * (xx + yy) * arg)
 
 
 def b_gatefunc(qubits, n, arg):
@@ -171,15 +232,7 @@ def d_gatefunc(qubit, n, arg):
     return gate
 
 
-
 # =========================================================================
-
-
-def swap_single_cgate(gate):
-    gate_tensor = gate.reshape((2, 2, 2, 2))      # reshape 4x4 gate to 2x2x2x2 tensor
-    gate_tensor = np.swapaxes(gate_tensor, 0, 1)  # Switch qubit 1
-    gate_tensor = np.swapaxes(gate_tensor, 2, 3)  # Switch qubit 2
-    return gate_tensor.reshape((4, 4))            # reshape 2x2x2x2 tensor to 4x4 gate
 
 
 GATE_DICT = {"i": id_gate, "x": x_gate, "y": y_gate, "z": z_gate,

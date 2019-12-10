@@ -37,14 +37,12 @@ def dmft_loop(siam, z, m2, vtol=1e-5):
     siam.update_hybridization(v)
 
 
-
 def main():
     u, t = 4, 1
     tmax, nt = 6, 24
     omax = 6
     omegas = np.linspace(-omax, omax, 10000)
     z = omegas + 0.01j
-
 
     siam = TwoSiteSiam.half_filling(u=u, v=t)
     m2 = m2_weight(t)
@@ -63,11 +61,6 @@ def main():
     plot.set_limits(0)
     plot.legend()
     plot.show()
-
-
-
-
-
 
 
 if __name__ == "__main__":

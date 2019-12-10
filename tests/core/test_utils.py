@@ -20,6 +20,23 @@ def test_kron():
     assert_array_equal(kron(a, a), aa)
 
 
+def test_is_unitary():
+    a = [[0, 1j], [1j, 0]]
+    assert is_unitary(a) is True
+
+    a = [[1, 0], [0, -1]]
+    assert is_unitary(a) is True
+
+    a = [[0, 1j], [-1j, 0]]
+    assert is_unitary(a) is True
+
+    a = [[1, 1], [1, 1]]
+    assert is_unitary(a) is False
+
+    a = [[1, 0], [0, 2]]
+    assert is_unitary(a) is False
+
+
 def test_get_projector():
     assert_array_equal(get_projector(ZERO), P0)
     assert_array_equal(get_projector(ONE), P1)

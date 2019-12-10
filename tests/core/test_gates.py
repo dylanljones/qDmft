@@ -53,6 +53,11 @@ def test_rz():
     assert_array_almost_equal(g, np.array([[+1j, 0], [0, -1j]]), decimal=10)
 
 
+def test_exp_gate():
+    g = exp_gate(np.eye(2))
+    assert_array_equal(g, np.array([[np.exp(1), 0], [0, np.exp(1)]]))
+
+
 def test_single_gate():
     g = single_gate(0, z_gate(), 2)
     z1 = np.diag([1, 1, -1, -1])

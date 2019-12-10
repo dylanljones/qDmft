@@ -11,32 +11,6 @@ from itertools import product
 from scitools import Plot, Circle
 
 
-class AmplitudePlot(Plot):
-
-    def __init__(self, n, lim=1.01):
-        super().__init__(create=False)
-        self.set_gridspec(n, n)
-        self.amps = list()
-        for i in range(int(n*n)):
-            ax = self.add_gridsubplot(i)
-            # Configure subplot
-            self.set_limits((-lim, lim), (-lim, lim))
-            self.set_ticklabels([], [])
-            self.set_equal_aspect()
-
-            circ = Circle((0, 0), radius=1.0, fill=False, color="k", lw=0.5)
-            ax.add_artist(circ)
-            self.amps.append(ax.plot([0, 1], [0, 0], lw=2)[0])
-        self.set_figsize(300, ratio=1)
-        self.tight()
-
-    def set_amps(self, amps):
-        for i in range(len(amps)):
-            amp = amps[i]
-            points = np.array([[0, 0], [amp.real, amp.imag]])
-            self.amps[i].set_data(*points.T)
-
-
 class Visualizer:
 
     def __init__(self, n):
@@ -145,9 +119,9 @@ class CircuitString(Visualizer):
         return layer0
 
     @staticmethod
-    def _empty(w=1):
-        empty = ""  # " " * w
-        line = ""  # "-" * w
+    def _empty():
+        empty = ""
+        line = ""
         return [empty, line, empty]
 
     @staticmethod
@@ -257,7 +231,6 @@ class CircuitString(Visualizer):
     def add_layer(self, lines, idx, padding=0):
         i = 0
         width = self.widths[idx]
-        space_pad, line_pad = " " * padding, "-" * padding
         for row in self.layers[idx]:
             if idx == 0:
                 lines[i + 0] += f"{row[0]: ^{width}}"

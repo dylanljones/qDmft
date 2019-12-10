@@ -9,21 +9,85 @@ version: 1.0
 import numpy as np
 from scitools import Terminal
 from .register import Qubit, Clbit, QuRegister, ClRegister
-from .utils import Basis, get_info, Result
+from .utils import Basis, get_info, binary_histogram, plot_binary_histogram
 from .backends import StateVector
 from .visuals import CircuitString
 from .instruction import Instruction, ParameterMap, Gate, Measurement
 
 
-# def init_bits(arg, bit_type):
-#     qubits = None
-#     if isinstance(arg, int):
-#         qubits = [bit_type(i) for i in range(arg)]
-#     elif isinstance(arg, bit_type):
-#         qubits = [arg]
-#     elif isinstance(arg, list):
-#         qubits = arg
-#     return qubits
+class Result:
+
+    def __init__(self, data):
+        self.data = data
+        self.basis = Basis(data.shape[1])
+
+    @property
+    def isnan(self):
+        """ bool: check if data is np.nan"""
+        return np.all(np.isnan(self.data))
+
+    @property
+    def shape(self):
+        """tuple: shape of the data array (n_measurements, n_bits)"""
+        return self.data.shape
+
+    @property
+    def n(self):
+        """int: number of measurments"""
+        return self.shape[0]
+
+    @property
+    def n_bits(self):
+        """int: number of bits"""
+        return self.shape[1]
+
+    @property
+    def labels(self):
+        """list of str: Labels of the basis-states of the measured qubits"""
+        return self.basis.labels
+
+    def __bool__(self):
+        return not self.isnan
+
+    def binary(self):
+        """ np.ndarray: Converts measurement data to binary representation"""
+        return (-self.data + 1) / 2
+
+    def mean(self):
+        """ np.ndarray: Computes the mean of the measurement data """
+        return np.mean(self.data, axis=0)
+
+    def binary_mean(self):
+        """ np.ndarray: Computes the mean of the binary data """
+        return (-np.sign(self.mean()) + 1) / 2
+
+    def histogram(self, normalize=True):
+        """ Computes the binary histogram of the measurement data
+
+        Parameters
+        ----------
+        normalize: bool, optional
+            Flag if the histogram should be normalized
+
+        Returns
+        -------
+        bins: np.ndarray
+        hist: np.ndarray
+        """
+        return binary_histogram(self.binary(), normalize)
+
+    def show_histogram(self, show=True, padding=0.2, color=None, alpha=0.9, max_line=True, lc="r", lw=1):
+        bins, hist = self.histogram()
+        plot = plot_binary_histogram(bins, hist, self.labels, padding, color, alpha, max_line, lc, lw)
+        if show:
+            plot.show()
+        return plot
+
+    def __str__(self):
+        string = f"Measurement Result (n={self.n}):\n"
+        string += f"  Mean:   {self.mean()}\n"
+        string += f"  Binary: {self.binary_mean()}"
+        return string
 
 
 class Circuit:
@@ -36,67 +100,48 @@ class Circuit:
         self.basis = Basis(self.n_qubits)
         self.instructions = list()
         self.pmap = ParameterMap.instance()
-        self.res = None
 
         self.state = StateVector(self.qubits, self.basis)
 
-    @classmethod
-    def like(cls, other):
-        return cls(other.qubits, other.clbits)
-
     @property
     def qubits(self):
+        """ list of Qubit: Qubits of the circuit """
         return self.qureg.bits
 
     @property
     def n_qubits(self):
+        """ int: Number of Qubits in the circuit """
         return self.qureg.n
 
     @property
     def clbits(self):
+        """ list of Clbit: Clbits of the circuit """
         return self.clreg.bits
 
     @property
     def n_clbits(self):
+        """ int: Number of Clbits in the circuit """
         return self.clreg.n
 
     @property
     def n_params(self):
+        """ int: Number of controllable parameters in the circuit """
         return len(self.pmap.params)
 
     @property
     def params(self):
+        """ list: List of controllable parameters in the circuit """
         return self.pmap.params
 
     @property
     def args(self):
+        """ list: List of arguments in the circuit """
         return self.pmap.args
 
     @property
     def statevector(self):
+        """ (N) np.ndarray: Coefficients of the current state of the circuit"""
         return self.state.amp
-
-    def save_state(self, name):
-        return np.save(name, self.state.amp)
-
-    def set_state(self, psi):
-        self.state.set(psi)
-
-    def load_state(self, name):
-        state = np.load(name)
-        self.set_state(state)
-
-    def init_params(self, *args):
-        self.pmap.init(*args)
-
-    def init(self, state):
-        self.state.set(state)
-
-    def set_params(self, args):
-        self.pmap.set(args)
-
-    def set_param(self, idx, arg):
-        self.pmap[idx] = arg
 
     def __getitem__(self, item):
         return self.instructions[item]
@@ -105,11 +150,70 @@ class Circuit:
         for inst in self.instructions:
             yield inst
 
-    def append(self, circuit):
-        for inst in circuit:
-            self.add(inst)
+    def __repr__(self):
+        return f"Circuit(qubits: {self.qubits}, clbits: {self.clbits})"
+
+    def __str__(self):
+        string = self.__repr__()
+        for inst in self.instructions:
+            string += "\n   " + str(inst)
+        return string
+
+    def print(self, show_args=True, padding=1, maxwidth=None):
+        s = CircuitString(len(self.qubits), padding)
+        for instructions in self.instructions:
+            s.add(instructions, show_arg=show_args)
+        print(s.build(wmax=maxwidth))
+
+    def show(self):
+        pass
+
+    def set_state(self, psi=None):
+        """ Set the current state-vector
+
+        Parameters
+        ----------
+        psi: array_like, optional
+            Coefficients of a state. The default is the .math:'|0>' state.
+        """
+        self.state.set(psi)
+
+    def prepare_state(self, *states):
+        """ Prepare the current state of the circuit using single qubit states.
+
+        Parameters
+        ----------
+        states: array_like of (2) array_like
+            Single qubit state-vectors.
+        """
+        self.state.prepare(*states)
+
+    def save_state(self, file):
+        """ Save the current state vector of the circuit to a file.
+
+        Parameters
+        ----------
+        file: file-like or str
+            File or filename to which the data is saved. If file is a string or Path,
+            a .npy extension will be appended to the file name if it does not already have one.
+        """
+        return self.state.save_state(file)
+
+    def load_state(self, file):
+        """ Load a state vector from a file.
+
+        Parameters
+        ----------
+        file: file-like or str
+            File or filename from which the data is loaded.
+        """
+        self.state.load_state(file)
 
     # =========================================================================
+
+    @staticmethod
+    def add_custom_gate(name, item):
+        Gate.add_custom_gate(name, item)
 
     def to_string(self, delim="; "):
         info = [f"qubits={self.n_qubits}", f"clbits={self.n_clbits}"]
@@ -149,66 +253,83 @@ class Circuit:
             string = f.read()
         return cls.from_string(string, delim)
 
-    def add_qubit(self, idx=None, add_clbit=False):
-        if idx is None:
-            idx = self.n_qubits
-        new = Qubit(idx)
-        for q in self.qubits:
-            if q.index >= idx:
-                q.index += 1
-        self.qubits.insert(idx, new)
-        self.basis = Basis(self.n_qubits)
-        self.state.set_qubits(self.qubits, self.basis)
-        if add_clbit:
-            self.add_clbit(idx)
-
-    def add_clbit(self, idx=None):
-        if idx is None:
-            idx = self.n_qubits
-        new = Clbit(idx)
-        for c in self.clbits:
-            if c.index >= idx:
-                c.index += 1
-        self.clbits.insert(idx, new)
-
-    def add_custom_gate(self, name, item):
-        Gate.add_custom_gate(name, item)
-
     # =========================================================================
 
-    def __repr__(self):
-        return f"Circuit(qubits: {self.qubits}, clbits: {self.clbits})"
+    def set_params(self, args):
+        """ Set all controllable parameters of the circuit
 
-    def __str__(self):
-        string = self.__repr__()
-        for inst in self.instructions:
-            string += "\n   " + str(inst)
-        return string
+        Parameters
+        ----------
+        args: list
+            All arguments for the parameters of the circuit
+        """
+        self.pmap.set(args)
 
-    def print(self, show_args=True, padding=1, maxwidth=None):
-        s = CircuitString(len(self.qubits), padding)
-        for instructions in self.instructions:
-            s.add(instructions, show_arg=show_args)
-        print(s.build(wmax=maxwidth))
+    def set_param(self, idx, arg):
+        """ Set a controllable parameter of the circuit
 
-    def show(self):
-        pass
-
-    # =========================================================================
+        Parameters
+        ----------
+        idx: int
+            Index of the parameter.
+        arg: float or int or complex
+            Arguments of the parameter.
+        """
+        self.pmap[idx] = arg
 
     def add(self, inst):
+        """ Appends a configured Intruction to the instruction list of the Circuit. """
         self.instructions.append(inst)
         return inst
 
     def add_gate(self, name, qubits, con=None, arg=None, argidx=None, n=1, trigger=1):
+        """ Configure and append a new Gate-Instruction to the Circuit.
+
+        Parameters
+        ----------
+        name: str
+            Name of the Gate used in the gate dictionary.
+        qubits: Qubit or array_like of Qubit
+            Qubits on which the gate acts.
+        con: Qubit or array_like of Qubit, optional
+            List of Qubits that controll the gate. If none are given the Gate isn't controlled.
+        arg: int or complex or float or array_like, optional
+            Argument of the Gate.
+        argidx: int, otional
+            Argument-index of the gate if a other parameter should be used.
+        n: int, optional
+            Number of Qubits the gate acts on. The default is 1.
+        trigger: int, optional
+            The trigger value if the gate is controlled. The default is 1.
+
+        Returns
+        -------
+        gate: Gate
+        """
         if qubits is None:
             qubits = self.qubits
         qubits = self.qureg.list(qubits)
         con = self.qureg.list(con)
-        gates = Gate(name, qubits, con, arg, argidx, n, trigger)
-        return self.add(gates)
+        gate = Gate(name, qubits, con, arg, argidx, n, trigger)
+        self.instructions.append(gate)
+        return gate
 
     def add_measurement(self, qubits, clbits, basis=None):
+        """ Configure and append a new Measurement-Instruction to the Circuit.
+
+        Parameters
+        ----------
+        qubits: Qubit or array_like of Qubit
+            Qubits that are measured.
+        clbits: Clbit or array_like of Clbit
+            Clbits to save measurment in.
+        basis: str, optional
+            The basis in which is measured. The default is the 'z'- or computational-Basis.
+
+        Returns
+        -------
+        inst: Instruction
+        """
         if qubits is None:
             qubits = range(self.n_qubits)
         if clbits is None:
@@ -216,66 +337,87 @@ class Circuit:
         qubits = self.qureg.list(qubits)
         clbits = self.clreg.list(clbits)
         m = Measurement("m", qubits, clbits, basis=basis)
-        return self.add(m)
+        self.instructions.append(m)
+        return m
 
     def i(self, qubit=None):
+        """ Add an identity gate to the circuit. """
         return self.add_gate("I", qubit)
 
     def x(self, qubit=None):
+        """ Add a Pauli-X gate to the circuit. """
         return self.add_gate("X", qubit)
 
     def y(self, qubit=None):
+        """ Add a Pauli-Y gate to the circuit. """
         return self.add_gate("Y", qubit)
 
     def z(self, qubit=None):
+        """ Add a Pauli-Z gate to the circuit. """
         return self.add_gate("Z", qubit)
 
     def h(self, qubit=None):
+        """ Add a Hadamard (H) gate to the circuit. """
         return self.add_gate("H", qubit)
 
     def s(self, qubit=None):
+        """ Add a phase (S) gate to the circuit. """
         return self.add_gate("S", qubit)
 
     def t(self, qubit=None):
+        """ Add a (T) gate to the circuit. """
         return self.add_gate("T", qubit)
 
     def rx(self, qubit, arg=np.pi/2, argidx=None):
+        """ Add a Pauli-X rotation-gate to the circuit. """
         return self.add_gate("Rx", qubit, arg=arg, argidx=argidx)
 
     def ry(self, qubit, arg=np.pi/2, argidx=None):
+        """ Add a Pauli-Y rotation-gate to the circuit. """
         return self.add_gate("Ry", qubit, arg=arg, argidx=argidx)
 
     def rz(self, qubit, arg=np.pi/2, argidx=None):
+        """ Add a Pauli-Z rotation-gate to the circuit. """
         return self.add_gate("Rz", qubit, arg=arg, argidx=argidx)
 
     def cx(self, con, qubit, trigger=1):
+        """ Add a controlled Pauli-X gate to the circuit. """
         return self.add_gate("X", qubit, con, trigger=trigger)
 
     def cy(self, con, qubit, trigger=1):
+        """ Add a controlled Pauli-Y gate to the circuit. """
         return self.add_gate("Y", qubit, con, trigger=trigger)
 
     def cz(self, con, qubit, trigger=1):
+        """ Add a controlled Pauli-Z gate to the circuit. """
         return self.add_gate("Z", qubit, con, trigger=trigger)
 
     def ch(self, con, qubit, trigger=1):
+        """ Add a controlled Hadamard (H) gate to the circuit. """
         return self.add_gate("H", qubit, con, trigger=trigger)
 
     def cs(self, con, qubit, trigger=1):
+        """ Add a phase (S) gate to the circuit. """
         return self.add_gate("S", qubit, con, trigger=trigger)
 
     def ct(self, con, qubit, trigger=1):
+        """ Add a (T) gate to the circuit. """
         return self.add_gate("T", qubit, con, trigger=trigger)
 
     def crx(self, con, qubit, arg=np.pi/2, argidx=None, trigger=1):
+        """ Add a controlled Pauli-X rotation-gate to the circuit. """
         return self.add_gate("Rx", qubit, con, arg, argidx, trigger=trigger)
 
     def cry(self, con, qubit, arg=np.pi/2, argidx=None, trigger=1):
+        """ Add a controlled Pauli-Y rotation-gate to the circuit. """
         return self.add_gate("Ry", qubit, con, arg, argidx, trigger=trigger)
 
     def crz(self, con, qubit, arg=np.pi/2, argidx=None, trigger=1):
+        """ Add a controlled Pauli-Z rotation-gate to the circuit. """
         return self.add_gate("Rz", qubit, con, arg, argidx, trigger=trigger)
 
     def xy(self, qubits, arg=0, argidx=None):
+        """ Add a XY-gate to the circuit. """
         if not hasattr(qubits[0], "__len__"):
             qubits = [qubits]
         qubits = [self.qureg.list(pair) for pair in qubits]
@@ -283,6 +425,7 @@ class Circuit:
         return self.add(gate)
 
     def b(self, qubits, arg=0, argidx=None):
+        """ Add a B-gate to the circuit. """
         if not hasattr(qubits[0], "__len__"):
             qubits = [qubits]
         qubits = [self.qureg.list(pair) for pair in qubits]
@@ -290,34 +433,85 @@ class Circuit:
         return self.add(gate)
 
     def m(self, qubits=None, clbits=None):
-        self.add_measurement(qubits, clbits)
+        """ Add a measurment in the computational basis to the circuit"""
+        self.add_measurement(qubits, clbits, "z")
 
     def mx(self, qubits=None, clbits=None):
+        """ Add a Pauli-X measurement to the circuit"""
         self.add_measurement(qubits, clbits, "x")
 
     def my(self, qubits=None, clbits=None):
+        """ Add a Pauli-Y measurement to the circuit"""
         self.add_measurement(qubits, clbits, "y")
 
     def mz(self, qubits=None, clbits=None):
+        """ Add a Pauli-Z measurement to the circuit"""
         self.add_measurement(qubits, clbits, "z")
 
     # =========================================================================
 
     def expectation(self, operator, qubit=None):
+        r""" Calculates the expectation value of a given operator.
+
+        See Also
+        --------
+        qsim.core.utils.expectation
+
+        Parameters
+        ----------
+        operator: np.ndarray
+            The exectation of this operator is caluclated
+        qubit: Qubit or int, optional
+            Qubit if the operator is a single-qubit operator.
+
+        Returns
+        -------
+        x: float
+        """
         if qubit is not None:
             qubit = self.qureg.list(qubit)[0]
         return self.state.expectation(operator, qubit)
 
     def measure(self, qubits, basis=None):
+        """ Measure the state of multiple qubits in a given eigenbasis.
+
+        See Also
+        --------
+        qsim.core.backends.Statevector.measure
+
+        Parameters
+        ----------
+        qubits: array_like of Qubit or Qubit
+            The qubits that are measured.
+        basis: str, optional
+            The basis in which is measured. The default is the 'z'- or computational-Basis.
+
+        Returns
+        -------
+        result: np.ndarray
+            Eigenvalue corresponding to the measured eigenstate.
+        """
         qubits = self.qureg.list(qubits)
         return self.state.measure(qubits, basis)
 
-    def apply_gate(self, inst):
-        self.state.apply_gate(inst)
-
     def run_shot(self, state=None):
-        self.init(state)
-        data = np.zeros(self.n_clbits, dtype="float")
+        """ Run the configured circuit once.
+
+        After initializing the state of the circuit each of the instructions is applied to the state.
+        If there are measurements configured, the data is saved in an array with the same number
+        of elements as there are classical bits in the circuit.
+
+        Parameters
+        ----------
+        state: array_like, optional
+            State used to initialize the circuit. The default is the .math:'|0>' state.
+
+        Returns
+        -------
+        data: np.ndarray of float or np.nan
+        """
+        self.set_state(state)
+        data = np.full(self.n_clbits, np.nan)
         for inst in self.instructions:
             if isinstance(inst, Gate):
                 self.state.apply_gate(inst)
@@ -328,7 +522,30 @@ class Circuit:
                     data[idx] = x
         return data
 
-    def run(self, shots=1, verbose=False, state=None):
+    def run(self, shots=1, state=None, verbose=False):
+        """ Run the configured circuit multiple times.
+
+        The circuit is run multiple times to extract state data from the circuit.
+        The data is returned in the Result object.
+
+        See Also
+        --------
+        Circuit.run_shot: One run of the circuit.
+        Result: object containing measurement data for easier conversion and statistics.
+
+        Parameters
+        ----------
+        shots: int, optional
+            Number of times the circuit is run.
+        state: array_like, optional
+            State used to initialize the circuit. The default is the .math:'|0>' state.
+        verbose: bool, optional
+            Flag for printing progress.
+
+        Returns
+        -------
+        res: Result
+        """
         terminal = Terminal()
         header = "Running experiment"
         if verbose:
@@ -340,11 +557,4 @@ class Circuit:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
         if verbose:
             terminal.writeln()
-            terminal.writeln(f"Result: {np.mean(data, axis=0)}")
-        return data
-
-    def histogram(self):
-        return self.res.hist
-
-    def show_histogram(self, show=True, *args, **kwargs):
-        return self.res.show_histogram(show, *args, **kwargs)
+        return Result(data)

@@ -6,11 +6,21 @@ author: Dylan Jones
 project: qsim
 version: 1.0
 """
+import pytest
+from numpy.testing import assert_array_equal
+from qsim.core.utils import kron, ONE, ZERO
+from qsim.core.circuit import Circuit
 
 
-def main():
-    pass
+def test_run_shot():
+    c = Circuit(2, 2)
+    c.x(0)
+    c.mz([0, 1])
 
+    res = c.run_shot()
+    assert_array_equal(res, [-1, 1])
 
-if __name__ == "__main__":
-    main()
+    s0 = kron(ONE, ONE)
+    res = c.run_shot(state=s0)
+    assert_array_equal(res, [1, -1])
+

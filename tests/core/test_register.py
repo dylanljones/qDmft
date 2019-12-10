@@ -9,7 +9,6 @@ version: 1.0
 from qsim.core.register import Bit, Register
 
 
-
 def test_bit():
     Bit.COUNTER = 0
     b = Bit()

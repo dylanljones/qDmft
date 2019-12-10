@@ -64,7 +64,7 @@ def test_expectation():
     x = state.expectation(op)
     assert pytest.approx(x, 1e-10) == +1.0
 
-    # <-i|x|-i> = -1,  <i|x|i> = +1
+    # <-i|y|-i> = -1,  <i|y|i> = +1
     op = kron(sy, si)
     state.prepare(IMINUS, ZERO)
     x = state.expectation(op)
@@ -74,7 +74,7 @@ def test_expectation():
     x = state.expectation(op)
     assert pytest.approx(x, 1e-10) == +1.0
 
-    # <0|x|0> = +1,  <1|x|1> = -1
+    # <0|z|0> = +1,  <1|z|1> = -1
     op = kron(sz, si)
     state.prepare(ZERO, ZERO)
     x = state.expectation(op)

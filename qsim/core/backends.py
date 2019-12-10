@@ -15,34 +15,6 @@ from .register import Qubit, QuRegister
 from .gates import GATE_DICT
 
 
-# class Backend:
-#
-#     def __init__(self, qubits, basis=None):
-#         self.qubits = None
-#         self.basis = None
-#         self.n_qubits = 0
-#         self.set_qubits(qubits, basis)
-#
-#     def add_custom_gate(self, name, item):
-#         pass
-#
-#     def set_qubits(self, qubits, basis=None):
-#         if isinstance(qubits, QuRegister):
-#             qubits = qubits.bits
-#         self.qubits = qubits
-#         self.n_qubits = len(qubits)
-#         self.basis = basis or Basis(len(qubits))
-#
-#     def state(self):
-#         pass
-#
-#     def apply_gate(self, gate):
-#         pass
-#
-#     def measure(self, bit):
-#         pass
-
-
 # =========================================================================
 #                             STATEVECTOR
 # =========================================================================
@@ -62,19 +34,19 @@ class StateVector:
         self.snapshots = list()
         self.set_qubits(qubits, basis, amp)
 
-    def set(self, amp=None):
-        state = kron([ZERO] * self.n_qubits) if amp is None else np.copy(amp)
-        if len(state) != self.n:
-            raise ValueError(f"Dimensions dont't match: {len(state)} != {self.n}")
-        if np.round(la.norm(state), decimals=10) != 1.0:
-            raise ValueError(f"State not normalized: |s|={np.round(la.norm(state), decimals=15)}")
-        self.amp = state / la.norm(state)
-
-    def prepare(self, *states):
-        amp = kron(*states)
-        self.set(amp)
-
     def set_qubits(self, qubits, basis=None, amp=None):
+        """ Initialize the statevector for the given qubits.
+
+        Parameters
+        ----------
+        qubits: array_like of Qubit
+            The Qubits of the system.
+        basis: Basis, optional
+            Basis object of the Qubits containing the state descriptions.
+            If not specified the Basis will be initialized.
+        amp: array_like, optional
+            Coefficients of the initial state. The default is the .math:'|0>' state.
+        """
         if isinstance(qubits, QuRegister):
             qubits = qubits.bits
         self.qubits = qubits
@@ -83,16 +55,45 @@ class StateVector:
         self.n = 2 ** self.n_qubits
         self.set(amp)
 
+    def set(self, amp=None):
+        """ Set the current state-vector
+
+        Parameters
+        ----------
+        amp: array_like, optional
+            Coefficients of the state. The default is the .math:'|0>' state.
+        """
+        state = kron([ZERO] * self.n_qubits) if amp is None else np.copy(amp)
+        if len(state) != self.n:
+            raise ValueError(f"Dimensions dont't match: {len(state)} != {self.n}")
+        if np.round(la.norm(state), decimals=10) != 1.0:
+            raise ValueError(f"State not normalized: |s|={np.round(la.norm(state), decimals=15)}")
+        self.amp = state / la.norm(state)
+
+    def prepare(self, *states):
+        """ Prepare the current state using single qubit states.
+
+        Parameters
+        ----------
+        states: array_like of (2) array_like
+            Single qubit state-vectors.
+        """
+        amp = kron(*states)
+        self.set(amp)
+
     @property
     def norm(self):
+        """ float: The norm of the state vector"""
         return la.norm(self.amp)
 
     @property
     def last(self):
+        """ np.ndarray: The last saved snapshot of the state vector """
         return self.snapshots[-1]
 
     @property
     def dtype(self):
+        """ np.dtype: The data type of the state vector """
         return self.amp.dtype
 
     def __getitem__(self, item):
@@ -111,31 +112,98 @@ class StateVector:
         return "\n".join(strings) + "\n"
 
     def save_state(self, file):
+        """ Save the current state vector to a file.
+
+        Parameters
+        ----------
+        file: file-like or str
+            File or filename to which the data is saved. If file is a string or Path,
+            a .npy extension will be appended to the file name if it does not already have one.
+        """
         np.save(file, self.amp)
 
     def load_state(self, file):
+        """ Load a state vector from a file.
+
+        Parameters
+        ----------
+        file: file-like or str
+            File or filename from which the data is loaded.
+        """
         self.amp = np.load(file)
 
     def save_snapshot(self):
+        """ Save the current state vector as snapshot. """
         s = StateVector(self.qubits, self.basis, self.amp)
         self.snapshots.append(s)
 
     def add_custom_gate(self, name, item):
+        """ Add custom Gate to the gate-dictionary """
         self.GATE_DICT.update({name: item})
 
     def density_matrix(self):
+        """ Constructs the density matrix from the current state vector
+
+        Returns
+        -------
+        rho: (N, N) np.array_like
+        """
         return np.dot(self.amp[:, np.newaxis], self.amp[np.newaxis, :])
 
     def amplitudes(self, decimals=10):
+        """ Computes the amplitudes from the state coefficients.
+
+        Parameters
+        ----------
+        decimals: int, optional
+            Decimals for rounding amplitudes.
+
+        Returns
+        -------
+        amps: (N) np.ndarray
+        """
         return np.round(self.amp, decimals)
 
     def probabilities(self, decimals=10):
+        """ Computes the state probabilities from the state coefficients.
+
+        Parameters
+        ----------
+        decimals: int, optional
+            Decimals for rounding probabilities.
+
+        Returns
+        -------
+        probs: (N) np.ndarray
+        """
         return np.abs(self.amplitudes(decimals))**2
 
     def histogram(self):
+        """ Computes the histogram of the state vector.
+
+        Returns
+        -------
+        bins: (N) np.ndarray
+            The bins of the histogram.
+        hist: (N) np.ndarray
+            The number of values in the corresponding bins of the histogram.
+        """
         return np.arange(self.n), np.abs(self.amp)
 
     def project(self, idx, op):
+        """ Get the projection of the state vector on a given single-qubit operator
+
+        Parameters
+        ----------
+        idx: int
+            Index of single qubit operator.
+        op: array_like
+            Single qubit operator.
+
+        Returns
+        -------
+        proj: (N, N) np.ndarray
+        """
         parts = [np.eye(2)] * self.n_qubits
         parts[idx] = op
         return np.dot(kron(parts), self.amp)
@@ -257,7 +325,7 @@ class StateVector:
         return eigvals[index].real
 
     def measure(self, qubits, eigvals=None, eigvecs=None, shadow=False, snapshot=True):
-        r""" Measure the state of a single qubit in a given eigenbasis.
+        r""" Measure the state of multiple qubits in a given eigenbasis.
 
         The probability .math:'p_i' of measuring each eigenstate of the measurement-eigenbasis
         is calculated using the projection .math:'P_i' of the corresponding eigenvector .math:'v_i'
@@ -412,64 +480,3 @@ class StateVector:
             Eigenvalue corresponding to the measured eigenstate.
         """
         return self.measure(qubits, EIGVALS, EV_Z, shadow, snapshot)
-
-    # def measure_qubit2(self, qubit, basis=None, shadow=False):
-    #     r""" Measure the state of a single qubit in a given eigenbasis.
-    #
-    #     The probability .math:'p_i' of measuring each eigenstate of the measurement-eigenbasis
-    #     is calculated using the projection .math:'P_i' of the corresponding eigenvector .math:'v_i'
-    #
-    #     .. math::
-    #         p_i = <\Psi| P_i | \Psi > \quad P_i = |v_i > < v_i|
-    #
-    #     The calculated probabilities are used to determine the corresponding eigenvalue .math:'\lambda_i'
-    #     which is the final measurement result. The state after the measurement is defined as:
-    #
-    #     .. math::
-    #         | \Psi_{\text{new}} > = \frac{P_i | \Psi >}{\norm{P_i | \Psi >}}
-    #
-    #     Parameters
-    #     ----------
-    #     qubit: Qubit
-    #         The qubit that is measured
-    #     basis: (2, 2) ndarray, optional
-    #         The basis in which is measured. The default is the computational basis with
-    #         eigenvalues '0' and '1'
-    #     shadow: bool, optional
-    #         Flag if state should remain in the pre-measurement state.
-    #         The default is 'False'.
-    #
-    #     Returns
-    #     -------
-    #     result: float
-    #         Eigenvalue corresponding to the measured eigenstate.
-    #     """
-    #     idx = qubit.index
-    #     # get eigenbasis of measurment operator.
-    #     # If not specified the computational basis is used
-    #     if basis is None:
-    #         v0, v1 = ZERO, ONE
-    #         eigvals = [0, 1]
-    #     else:
-    #         eigvals, eigvecs = la.eig(basis)
-    #         v0, v1 = eigvecs.T
-    #     # Calculate probability of getting first eigenstate as result
-    #     op0 = np.dot(v0[:, np.newaxis], v0[np.newaxis, :])
-    #     projected = self.project(idx, op0)
-    #     p0 = np.dot(self.amp, projected)
-    #     # Simulate measurement probability
-    #     index = int(np.random.random() > p0)
-    #     if index == 1:
-    #         # Project state to other eigenstate of the measurement basis
-    #         op1 = np.dot(v1[:, np.newaxis], v1[np.newaxis, :])
-    #         projected = self.project(idx, op1)
-    #     # Project measurement result on the state
-    #     if not shadow:
-    #         self.amp = projected / la.norm(projected)
-    #     # return corresponding eigenvalue of the measured eigenstate
-    #     return eigvals[index].real
-    #
-    # def measure2(self, qbits, eigvals=None, eigvecs=None, snapshot=True, shadow=False):
-    #     if snapshot:
-    #         self.save_snapshot()
-    #     return [self.measure_qubit(q, eigvals, eigvecs, shadow) for q in to_array(qbits)]

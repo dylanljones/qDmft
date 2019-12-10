@@ -6,51 +6,18 @@ author: Dylan Jones
 project: qsim
 version: 0.1
 """
+import os
 import numpy as np
-import numpy.linalg as la
-from scitools import Terminal
-from qsim.core import *
-from qsim import Circuit, VqeSolver
-from qsim.twosite import *
-from dmft import *
+from scitools import prange, Plot
+from qsim import pauli, ZERO, kron, Circuit, VqeSolver
+from qsim.dmft import fit_gf_measurement, print_popt, get_gf_fit_data, get_gf_spectral_data
+from dmft import TwoSiteSiam, impurity_gf_ref
+
+STATE_FILE = "data/siam_gs.npy"
+DATA_RE_FILE = "data/measurement_re.npz"
+DATA_IM_FILE = "data/measurement_im.npz"
 
 si, sx, sy, sz = pauli
-
-STATE_FILE = "siam_gs.npy"
-
-
-def plot_measurement(tau, data, fit=None):
-    plot = Plot(xlim=[0, np.max(tau)], ylim=[-1, 1])
-    plot.set_labels(r"$\tau t^*$", r"$G_{imp}^{R}(\tau)$")
-    plot.grid()
-    plot.set_title(f"N={len(data)-1}")
-    plot.plot(tau, data.real, label="real", color="k")
-    plot.plot(tau, data.imag, label="imag", lw=0.5)
-    if fit is not None:
-        plot.plot(*fit, color="r", label="Fit")
-    plot.legend()
-    plot.show()
-
-
-def plot_all(tau, data, t_fit, fit, z, gf):
-    plot = Plot.subplots(2, 1)
-    plot.set_figsize(width=800)
-    plot.add_gridsubplot(0)
-    plot.set_limits((0, np.max(tau)), (-1.05, 1.05))
-    plot.set_labels(r"$\tau t^*$", r"$G_{imp}^{R}(\tau)$")
-    plot.plot(tau, data.real, label="real", color="k")
-    plot.plot(tau, data.imag, label="imag", lw=0.5)
-    plot.plot(t_fit, fit, color="r", label="Fit", ls="--", lw=1.0)
-    plot.legend()
-    plot.grid()
-
-    plot.add_gridsubplot(1)
-    plot.set_labels(r"$\omega$", r"$A(\omega)$")
-    plot.set_limits((np.min(z.real), np.max(z.real)))
-    plot.plot(z.real, -gf.imag)
-    plot.grid()
-    plot.show()
-
 
 # =========================================================================
 #                         GROUND STATE PREPARATION
@@ -76,7 +43,7 @@ def config_vqe_circuit(c):
     return c
 
 
-def prepare_groundstate(file, u=4, v=1, eps=None, mu=None):
+def prepare_groundstate(u=4, v=1, eps=None, mu=None):
     print("Preparing ground-state")
     if eps is None:
         eps = u/2
@@ -85,88 +52,138 @@ def prepare_groundstate(file, u=4, v=1, eps=None, mu=None):
     ham = hamiltonian(u, eps, mu, v)
     vqe = VqeSolver(ham)
     config_vqe_circuit(vqe.circuit)
-    bounds = [(0, 2*np.pi)] * vqe.n_params
-    sol = vqe.minimize(bounds=bounds)
+    sol = vqe.minimize()
     print(sol)
-    if sol.error <= 1e-10:
-        vqe.save_state(file)
-    return vqe.circuit.state.amp
+    return vqe.circuit.state.amp, sol
 
 
+def get_ground_state(siam, file=STATE_FILE, new=False):
+    if new or not os.path.isfile(file):
+        gs, sol = prepare_groundstate(siam.u, siam.v, siam.eps_bath, siam.mu)
+        if sol.error <= 1e-10:
+            print("Saving ground state...")
+            np.save(file, gs)
+    else:
+        print("Loading ground state...")
+        gs = np.load(STATE_FILE)
+    return kron(ZERO, gs)
+
+# =========================================================================
+#                               MEASUREMENT
 # =========================================================================
 
 
-def print_popt(popt, dec=2):
-    strings = list(["Green's function fit:"])
-    strings.append(f"  alpha_1 = {popt[0]:.{dec}}")
-    strings.append(f"  alpha_2 = {popt[1]:.{dec}}")
-    strings.append(f"  omega_1 = {popt[2]:.{dec}}")
-    strings.append(f"  omega_2 = {popt[3]:.{dec}}")
-    line = "-" * (max([len(x) for x in strings]) + 1)
-    print(line)
-    print("\n".join(strings))
-    print(line)
+def _measure(gs, xy_arg, b_arg, step, alpha, beta, imag=True):
+    c = Circuit(5, 1)
+    c.h(0)
+    c.add_gate(f"c{alpha.upper()}", qubits=1, con=0, trigger=0)
+    for i in range(step):
+        c.xy([[1, 2], [3, 4]], xy_arg)
+        c.b([1, 3], b_arg)
+    c.add_gate(f"c{beta.upper()}", qubits=1, con=0, trigger=1)
+    c.h(0)
+    c.run_shot(state=gs)
+    return c.expectation(sz, 0) if imag else c.expectation(sy, 0)
 
 
-def plot_measurement(siam, gs, tmax, nt):
+def measure_data(siam, gs, nt, tmax, imag=True):
+    n = nt + 1
     dt = tmax / nt
-    gs = kron(ZERO, gs)
-    times, data = measure_gf(gs, siam.u, siam.v, nt, dt, imag=True, shots=None)
-    popt, errs = fit_gf_measurement(times, data.real, p0=[0.1, 0.4, 1, 2.5])
-    print_popt(popt)
-    t_fit, fit = get_gf_fit_data(popt, tmax, n=100)
-    z, gf = get_gf_spectral_data(popt, 6, n=1000)
+    b_arg = dt * siam.u / 4
+    xy_arg = dt * siam.v / 2
+    times = np.arange(n) * dt
+    data = np.zeros((n, 4), "complex")
+    header = "Measuring " + ("real" if imag is False else "imaginary")
+    for step in prange(n, header=header):
+        xx = _measure(gs, xy_arg, b_arg, step, "x", "x", imag)
+        xy = _measure(gs, xy_arg, b_arg, step, "x", "y", imag)
+        yx = _measure(gs, xy_arg, b_arg, step, "y", "x", imag)
+        yy = _measure(gs, xy_arg, b_arg, step, "y", "y", imag)
+        data[step] = [xx, xy, yx, yy]
+    return times, data
 
-    plot_all(times, data, t_fit, fit, z, gf)
 
+def get_measurement_data(siam, gs, nt, tmax, file, imag=True, new=False):
+    if new or not os.path.isfile(file):
+        times, data = measure_data(siam, gs, nt, tmax, imag)
+        print("Saving data...")
+        np.savez(file, times=times, data=data)
+        return times, data
+    else:
+        print("Loading " + ("real" if imag is False else "imaginary") + " data...")
+        file_data = np.load(file)
+        return file_data["times"], file_data["data"]
+
+
+# =========================================================================
+#                               GREENS FUNCTION
+# =========================================================================
+
+
+def gf_greater(xx, yx, xy, yy):
+    return -0.25j * (xx + 1j*yx - 1j*xy + yy)
+
+
+def gf_lesser(xx, xy, yx, yy):
+    return +0.25j * (xx - 1j*xy + 1j*yx + yy)
+
+
+def greens_function(data):
+    n = data.shape[0]
+    gf = np.zeros(n, dtype="complex")
+    for i in range(n):
+        xx, xy, yx, yy = data[i]
+        gf_g = gf_greater(xx, yx, xy, yy)
+        gf_l = gf_lesser(xx, xy, yx, yy)
+        gf[i] = gf_g - gf_l
+    return gf
+
+
+def measure_gf_imag(siam, nt, tmax, new_state=True, new_data=True):
+    gs = get_ground_state(siam, new=new_state, file=STATE_FILE)
+    times, data_im = get_measurement_data(siam, gs, nt, tmax, imag=True, new=new_data, file=DATA_IM_FILE)
+    return times, -greens_function(data_im).imag
+
+
+def plot_result(times, data, t_fit, fit, z, gf, gf_ref=None):
+    plot = Plot.subplots(2, 1, hr=(1, 1))
+    # plot.set_figsize(width=800)
+    plot.add_gridsubplot(0)
+    plot.set_limits((0, np.max(times)), (-1.05, 1.05))
+    plot.set_labels(r"$\tau t^*$", r"Im $G_{imp}^{R}(\tau)$")
+    # plot.plot(times, data.real, label="real", color="k")
+    plot.plot(times, data, marker="o", ms=2, label="Data", lw=1, color="k")
+    plot.plot(t_fit, fit, color="r", label="Fit", ls="--", lw=1.0)
+    plot.legend()
+    plot.grid()
+
+    plot.add_gridsubplot(1)
+    plot.set_labels(r"$\omega / t^*$", r"-Im $G_{imp}^{R}(\omega + i\eta)$")
+    plot.set_limits((np.min(z.real), np.max(z.real)))
+    plot.plot(z.real, -gf.imag, color="r", label="Fit")
+    if gf_ref is not None:
+        plot.plot(z.real, -gf_ref.imag, label="Exact", color="k", ls="--")
+    plot.legend()
+    plot.grid()
+    return plot
 
 
 def main():
+    new_state = False
+    new_data = False
     u, t = 4, 1
-    tmax, nt = 6, 24
-    omax = 4
-    omegas = np.linspace(-omax, omax, 10000)
-    z = omegas + 0.01j
-    p0 = [0.1, 0.4, 1, 2.5]
+    tmax, nt = 12, 96
+    siam = TwoSiteSiam(u=u, eps_imp=0, eps_bath=0, v=t, mu=u/2)
 
-    siam = TwoSiteSiam.half_filling(u=u, v=t)
-    m2 = m2_weight(t)
+    times, gf_im = measure_gf_imag(siam, nt, tmax, new_state, new_data)
+    popt, errs = fit_gf_measurement(times, gf_im.real, p0=[0.5, 0.5, 1, 4])
+    t_fit, fit = get_gf_fit_data(popt, tmax, n=100)
+    z, gf = get_gf_spectral_data(popt, zmax=6, n=1000)
 
-    # gs = prepare_groundstate(STATE_FILE, u, v)
-    gs = np.load(STATE_FILE)
-
-    gf = measure_gf_spectral(siam, gs, tmax, nt, z, p0)
+    print_popt(popt, errs)
     gf_ref = impurity_gf_ref(z, siam.u, siam.v)
-
-    plot = Plot()
-    plot.plot(z.real, -gf.imag, label="Measured")
-    plot.plot(z.real, -gf_ref.imag, label="Exact")
-    plot.legend()
+    plot = plot_result(times, gf_im, t_fit, fit, z, gf, gf_ref)
     plot.show()
-
-
-    return
-    gf_0 = impurity_gf_free_ref(z, siam.eps_imp, siam.eps_bath, siam.v)
-    sigma = self_energy(gf_0, gf)
-
-    qp = quasiparticle_weight(z.real, sigma)
-    v_new = new_hybridization(qp, m2, siam.v)
-    print(v_new)
-
-    plot = Plot(xlabel=r"$\omega$")
-    plot.grid()
-    plot.plot(z.real, -sigma.imag, color="k", label=r"-Im $\Sigma_{imp}(z)$")
-    plot.plot(z.real, -gf_0.imag, label=r"-Im $G_{imp}^{0}(z)$")
-    plot.plot(z.real, -gf.imag, label=r"-Im $G_{imp}(z)$")
-
-    plot.set_limits(0)
-    plot.legend()
-
-    plot.show()
-
-
-
-
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ project: qsim
 version: 1.0
 """
 import numpy as np
-from .utils import to_list, kron, str_to_list
+from .utils import to_list, str_to_list
 from .utils import EIGVALS, EV_X, EV_Y, EV_Z
 from .gates import GATE_DICT, single_gate, cgate
 
@@ -253,7 +253,7 @@ class Measurement(Instruction):
 
     def eigenbasis(self):
         if not self.basis:
-            return None
+            return [0, 1], np.array([[1, 0], [0, 1]])
         if self.basis.lower() == "x":
             return EIGVALS, EV_X
         elif self.basis.lower() == "y":
@@ -277,6 +277,10 @@ class Gate(Instruction):
         super().__init__(name, qubits, con=con, n=n, arg=arg, argidx=argidx, trigger=trigger)
         if con is not None:
             self.name = "c" * len(self.con) + self.name
+
+    @classmethod
+    def add_custom_gate(cls, name, item):
+        cls.GATE_DICT.update({name: item})
 
     @classmethod
     def x(cls, qubits, con=None, trigger=1):
@@ -319,8 +323,9 @@ class Gate(Instruction):
         return cls("XY", [qubit1, qubit2], arg=arg, argidx=argidx, n=2)
 
     @classmethod
-    def add_custom_gate(cls, name, item):
-        cls.GATE_DICT.update({name: item})
+    def custom(cls, name, func, qubits, con=None, arg=None, argidx=None, n=1, trigger=1):
+        cls.add_custom_gate(name, func)
+        return cls(name, qubits, con, arg, argidx, n, trigger)
 
     @classmethod
     def _get_gatefunc(cls, name):
