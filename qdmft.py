@@ -10,6 +10,7 @@ import os
 import numpy as np
 from scitools import prange, Plot
 from qsim import pauli, ZERO, kron, Circuit, VqeSolver
+from qsim.dmft import gf_greater, gf_lesser, gf_spectral
 from qsim.dmft import fit_gf_measurement, print_popt, get_gf_fit_data, get_gf_spectral_data
 from dmft import TwoSiteSiam, impurity_gf_ref
 
@@ -53,7 +54,6 @@ def prepare_groundstate(u=4, v=1, eps=None, mu=None):
     vqe = VqeSolver(ham)
     config_vqe_circuit(vqe.circuit)
     sol = vqe.minimize()
-    print(sol)
     return vqe.circuit.state.amp, sol
 
 
@@ -117,15 +117,7 @@ def get_measurement_data(siam, gs, nt, tmax, file, imag=True, new=False):
 
 # =========================================================================
 #                               GREENS FUNCTION
-# =========================================================================
-
-
-def gf_greater(xx, yx, xy, yy):
-    return -0.25j * (xx + 1j*yx - 1j*xy + yy)
-
-
-def gf_lesser(xx, xy, yx, yy):
-    return +0.25j * (xx - 1j*xy + 1j*yx + yy)
+# ========================================================================
 
 
 def greens_function(data):
@@ -169,18 +161,19 @@ def plot_result(times, data, t_fit, fit, z, gf, gf_ref=None):
 
 
 def main():
-    new_state = False
-    new_data = False
+    new_state = True
+    new_data = True
     u, t = 4, 1
-    tmax, nt = 12, 96
+    tmax, nt = 6, 48
     siam = TwoSiteSiam(u=u, eps_imp=0, eps_bath=0, v=t, mu=u/2)
+    p0 = [0.5, 0.5, siam.v, siam.u]
 
     times, gf_im = measure_gf_imag(siam, nt, tmax, new_state, new_data)
-    popt, errs = fit_gf_measurement(times, gf_im.real, p0=[0.5, 0.5, 1, 4])
+    popt, errs = fit_gf_measurement(times, gf_im.real, p0=p0)
     t_fit, fit = get_gf_fit_data(popt, tmax, n=100)
     z, gf = get_gf_spectral_data(popt, zmax=6, n=1000)
-
     print_popt(popt, errs)
+
     gf_ref = impurity_gf_ref(z, siam.u, siam.v)
     plot = plot_result(times, gf_im, t_fit, fit, z, gf, gf_ref)
     plot.show()
