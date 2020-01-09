@@ -17,10 +17,10 @@ def test_run_shot():
     c.x(0)
     c.mz([0, 1])
 
-    res = c.run_shot()
+    res = c.run_circuit()
     assert_array_equal(res, [-1, 1])
 
     s0 = kron(ONE, ONE)
-    res = c.run_shot(state=s0)
+    res = c.run_circuit(state=s0)
     assert_array_equal(res, [1, -1])
 

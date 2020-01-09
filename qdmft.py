@@ -10,15 +10,35 @@ import os
 import numpy as np
 from scitools import prange, Plot
 from qsim import pauli, ZERO, kron, Circuit, VqeSolver
-from qsim.dmft import gf_greater, gf_lesser, gf_spectral
+from qsim.dmft import gf_greater, gf_lesser
 from qsim.dmft import fit_gf_measurement, print_popt, get_gf_fit_data, get_gf_spectral_data
 from dmft import TwoSiteSiam, impurity_gf_ref
 
-STATE_FILE = "data/siam_gs.npy"
-DATA_RE_FILE = "data/measurement_re.npz"
-DATA_IM_FILE = "data/measurement_im.npz"
-
+STATE_FILE = "data/twosite_hf_gs.npy"
+DATA_RE_FILE = "data/twosite_hf_re.npz"
+DATA_IM_FILE = "data/twosite_hf_im.npz"
+DATA_RE_SIM_FILE = "data/twosite_hf_re_sim.npz"
+DATA_IM_SIM_FILE = "data/twosite_hf_im_sim.npz"
 si, sx, sy, sz = pauli
+
+
+class MeasurementData(dict):
+
+    def __init__(self, gs=None, times=None, data=None):
+        super().__init__(gs=gs, times=times, data=data)
+
+    @property
+    def gs(self):
+        return self["gs"]
+
+    @property
+    def times(self):
+        return self["times"]
+
+    @property
+    def data(self):
+        return self["data"]
+
 
 # =========================================================================
 #                         GROUND STATE PREPARATION
@@ -73,20 +93,27 @@ def get_ground_state(siam, file=STATE_FILE, new=False):
 # =========================================================================
 
 
-def _measure(gs, xy_arg, b_arg, step, alpha, beta, imag=True):
+def _measure(gs, xy_arg, b_arg, step, alpha, beta, imag=True, shots=None):
     c = Circuit(5, 1)
     c.h(0)
     c.add_gate(f"c{alpha.upper()}", qubits=1, con=0, trigger=0)
     for i in range(step):
         c.xy([[1, 2], [3, 4]], xy_arg)
         c.b([1, 3], b_arg)
+
     c.add_gate(f"c{beta.upper()}", qubits=1, con=0, trigger=1)
     c.h(0)
-    c.run_shot(state=gs)
-    return c.expectation(sz, 0) if imag else c.expectation(sy, 0)
+    c.run_circuit(state=gs)
+    if shots is None:
+        return c.expectation(sz, 0) if imag else c.expectation(sy, 0)
+    else:
+        x = np.zeros(shots)
+        for i in range(shots):
+            x[i] = c.measure_z(0, True)[0] if imag else c.measure_y(0, True)[0]
+        return np.mean(x)
 
 
-def measure_data(siam, gs, nt, tmax, imag=True):
+def measure_data(siam, gs, nt, tmax, imag=True, shots=None):
     n = nt + 1
     dt = tmax / nt
     b_arg = dt * siam.u / 4
@@ -95,17 +122,17 @@ def measure_data(siam, gs, nt, tmax, imag=True):
     data = np.zeros((n, 4), "complex")
     header = "Measuring " + ("real" if imag is False else "imaginary")
     for step in prange(n, header=header):
-        xx = _measure(gs, xy_arg, b_arg, step, "x", "x", imag)
-        xy = _measure(gs, xy_arg, b_arg, step, "x", "y", imag)
-        yx = _measure(gs, xy_arg, b_arg, step, "y", "x", imag)
-        yy = _measure(gs, xy_arg, b_arg, step, "y", "y", imag)
+        xx = _measure(gs, xy_arg, b_arg, step, "x", "x", imag, shots)
+        xy = _measure(gs, xy_arg, b_arg, step, "x", "y", imag, shots)
+        yx = _measure(gs, xy_arg, b_arg, step, "y", "x", imag, shots)
+        yy = _measure(gs, xy_arg, b_arg, step, "y", "y", imag, shots)
         data[step] = [xx, xy, yx, yy]
     return times, data
 
 
-def get_measurement_data(siam, gs, nt, tmax, file, imag=True, new=False):
+def get_measurement_data(siam, gs, nt, tmax, file, imag=True, shots=None, new=False):
     if new or not os.path.isfile(file):
-        times, data = measure_data(siam, gs, nt, tmax, imag)
+        times, data = measure_data(siam, gs, nt, tmax, imag, shots)
         print("Saving data...")
         np.savez(file, times=times, data=data)
         return times, data
@@ -115,7 +142,7 @@ def get_measurement_data(siam, gs, nt, tmax, file, imag=True, new=False):
         return file_data["times"], file_data["data"]
 
 
-# =========================================================================
+# ========================================================================
 #                               GREENS FUNCTION
 # ========================================================================
 
@@ -131,18 +158,22 @@ def greens_function(data):
     return gf
 
 
-def measure_gf_imag(siam, nt, tmax, new_state=True, new_data=True):
-    gs = get_ground_state(siam, new=new_state, file=STATE_FILE)
-    times, data_im = get_measurement_data(siam, gs, nt, tmax, imag=True, new=new_data, file=DATA_IM_FILE)
+def measure_gf_imag(siam, nt, tmax, shots=None, new_state=True, new_data=True):
+    state_file = STATE_FILE
+    data_file = DATA_IM_FILE
+    gs = get_ground_state(siam, new=new_state, file=state_file)
+    times, data_im = get_measurement_data(siam, gs, nt, tmax, imag=True, shots=shots, new=new_data, file=data_file)
     return times, -greens_function(data_im).imag
 
 
-def plot_result(times, data, t_fit, fit, z, gf, gf_ref=None):
+def plot_result(times, data, t_fit, fit, z, gf, gf_ref=None, title=None):
     plot = Plot.subplots(2, 1, hr=(1, 1))
     # plot.set_figsize(width=800)
+    if title:
+        plot.set_title(title)
     plot.add_gridsubplot(0)
     plot.set_limits((0, np.max(times)), (-1.05, 1.05))
-    plot.set_labels(r"$\tau t^*$", r"Im $G_{imp}^{R}(\tau)$")
+    plot.set_labels(r"$\tau t^*$", r"$iG_{imp}^{R}(\tau)$")
     # plot.plot(times, data.real, label="real", color="k")
     plot.plot(times, data, marker="o", ms=2, label="Data", lw=1, color="k")
     plot.plot(t_fit, fit, color="r", label="Fit", ls="--", lw=1.0)
@@ -161,21 +192,21 @@ def plot_result(times, data, t_fit, fit, z, gf, gf_ref=None):
 
 
 def main():
-    new_state = True
-    new_data = True
     u, t = 4, 1
     tmax, nt = 6, 48
     siam = TwoSiteSiam(u=u, eps_imp=0, eps_bath=0, v=t, mu=u/2)
     p0 = [0.5, 0.5, siam.v, siam.u]
+    shots = 1000
 
-    times, gf_im = measure_gf_imag(siam, nt, tmax, new_state, new_data)
+    times, gf_im = measure_gf_imag(siam, nt, tmax, shots, new_data=True, new_state=True)
     popt, errs = fit_gf_measurement(times, gf_im.real, p0=p0)
     t_fit, fit = get_gf_fit_data(popt, tmax, n=100)
-    z, gf = get_gf_spectral_data(popt, zmax=6, n=1000)
+    z, gf = get_gf_spectral_data(popt, zmax=4, n=1000)
     print_popt(popt, errs)
 
     gf_ref = impurity_gf_ref(z, siam.u, siam.v)
-    plot = plot_result(times, gf_im, t_fit, fit, z, gf, gf_ref)
+    title = f"samples={shots}, N$_t$={nt}"
+    plot = plot_result(times, gf_im, t_fit, fit, z, gf, gf_ref, title)
     plot.show()
 
 

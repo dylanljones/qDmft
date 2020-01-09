@@ -4,7 +4,7 @@ Created on 26 Sep 2019
 author: Dylan Jones
 
 project: qsim
-version: 0.1
+version: 1.0
 """
 import numpy as np
 from scipy.linalg import expm
@@ -228,7 +228,7 @@ def c_gatefunc(qubit, n, arg):
 
 def d_gatefunc(qubit, n, arg):
     sigma = single_gate(qubit, Z_GATE, n)
-    gate = expm(-1j * sigma * arg)
+    gate = expm(1j * sigma * arg)
     return gate
 
 
@@ -238,5 +238,5 @@ def d_gatefunc(qubit, n, arg):
 GATE_DICT = {"i": id_gate, "x": x_gate, "y": y_gate, "z": z_gate,
              "h": h_gate, "s": s_gate, "t": t_gate,
              "rx": rx_gate, "ry": ry_gate, "rz": rz_gate,
-             "xy": xy_gatefunc, "b": b_gatefunc, "d": b_gatefunc, "c": c_gatefunc
+             "xy": xy_gatefunc, "b": b_gatefunc, "d": d_gatefunc, "c": c_gatefunc
              }

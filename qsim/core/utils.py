@@ -4,7 +4,7 @@ Created on 26 Sep 2019
 author: Dylan Jones
 
 project: qsim
-version: 0.1
+version: 1.0
 """
 import re
 import numpy as np
@@ -82,7 +82,7 @@ def get_projector(v):
     r""" Constructs a projection-matrix from a given vector.
 
     .. math::
-        P = |v><v|
+        P = | v \rangle \langle v |
 
     Parameters
     ----------
@@ -102,7 +102,7 @@ def expectation(o, psi):
     r""" Computes the expectation value of an operator in a given state.
 
     .. math::
-        x = <\Psi| \hat{O} |\Psi>
+        x = \langle \Psi| \hat{O} |\Psi \rangle
 
     Parameters
     ----------
@@ -116,6 +116,23 @@ def expectation(o, psi):
     x: float
     """
     return np.dot(np.conj(psi).T, o.dot(psi)).real
+
+
+def density_matrix(psi):
+    r""" Computes the density matrix of a given state
+
+    .. math::
+        \rho = | \Psi \rangle \langle \Psi |
+
+    Parameters
+    ----------
+    psi: (N) np.ndarray
+
+    Returns
+    -------
+    rho: (N, N) np.ndarray
+    """
+    return np.dot(psi[:, np.newaxis], psi[np.newaxis, :])
 
 
 def binstr(x, n=None):
@@ -220,7 +237,7 @@ def str_to_list(s, dtype=int):
 
     Returns
     -------
-    data_list: list
+    l: list
     """
     s = s.strip()
     if s == "None":
@@ -258,6 +275,7 @@ class Basis:
         self.qbits = n
         self.n = 2 ** n
         self.states = basis_states(self.n)
+        self.state_labels = [f"{binstr(x, n)}" for x in range(self.n)]
         self.labels = [f"|{binstr(x, n)}>" for x in range(self.n)]
 
     def get_indices(self, qubit, val):
@@ -282,10 +300,15 @@ def binary_histogram(data, normalize=True):
     return bins, hist
 
 
-def plot_binary_histogram(bins, hist, labels=None, padding=0.2, color=None, alpha=0.9, max_line=True, lc="r", lw=1):
-    plot = Plot(xlim=(-0.5, len(bins) - 0.5), ylim=(0, 1.1))
+def plot_binary_histogram(bins, hist, labels=None, padding=0.2, color=None, alpha=0.9, scale=False,
+                          max_line=True, lc="r", lw=1):
+    plot = Plot()
+    plot.set_limits(xlim=(-0.5, len(bins) - 0.5))
+    plot.set_ticks(xticks=bins)
+    if not scale:
+        plot.set_limits(ylim=(0, 1.1))
+        plot.set_ticks(yticks=np.arange(0, 1.1, 0.2))
     plot.grid(axis="y")
-    plot.set_ticks(bins, np.arange(0, 1.1, 0.2))
     if labels is not None:
         plot.set_ticklabels(labels)
     plot.bar(bins, hist, width=1-padding, color=color, alpha=alpha)

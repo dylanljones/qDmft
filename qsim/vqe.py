@@ -101,7 +101,7 @@ class VqeSolver:
 
     def expectation(self, params):
         self.circuit.set_params(params)
-        self.circuit.run_shot()
+        self.circuit.run_circuit()
         return self.circuit.expectation(self.ham)
 
     def minimize(self, x0=None, **kwargs):

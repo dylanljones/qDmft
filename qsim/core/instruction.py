@@ -117,11 +117,26 @@ class Instruction:
         self.size = n
         self.name = name
 
+        self.qubits = None
+        self.con = None
+        self.clbits = None
+        self.con_trigger = trigger
+        self.pmap.add(arg, argidx)
+
+        self._init(qubits, con, clbits)
+
+    def _init(self, qubits, con, clbits):
         self.qubits = to_list(qubits) if qubits is not None else None
         self.con = to_list(con) if con is not None else None
         self.clbits = to_list(clbits) if clbits is not None else None
-        self.con_trigger = trigger
-        self.pmap.add(arg, argidx)
+
+    @property
+    def is_gate(self):
+        return isinstance(self, Gate)
+
+    @property
+    def is_measurement(self):
+        return isinstance(self, Measurement)
 
     @property
     def is_controlled(self):

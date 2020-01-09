@@ -9,7 +9,7 @@ version: 1.0
 import numpy as np
 from scitools import Terminal
 from .register import Qubit, Clbit, QuRegister, ClRegister
-from .utils import Basis, get_info, binary_histogram, plot_binary_histogram
+from .utils import Basis, get_info, binary_histogram, plot_binary_histogram, density_matrix
 from .backends import StateVector
 from .visuals import CircuitString
 from .instruction import Instruction, ParameterMap, Gate, Measurement
@@ -20,6 +20,23 @@ class Result:
     def __init__(self, data):
         self.data = data
         self.basis = Basis(data.shape[1])
+
+    @classmethod
+    def laod(cls, file):
+        """ Load a measurement result from a file
+
+        Parameters
+        ----------
+        file: file-like or str
+            File or filename from which the data is loaded. If file is a string or Path,
+            a .npy extension will be appended to the file name if it does not already have one.
+
+        Returns
+        -------
+        res: Result
+        """
+        data = np.load(file)
+        return cls(data)
 
     @property
     def isnan(self):
@@ -32,7 +49,7 @@ class Result:
         return self.data.shape
 
     @property
-    def n(self):
+    def n_samples(self):
         """int: number of measurments"""
         return self.shape[0]
 
@@ -44,10 +61,21 @@ class Result:
     @property
     def labels(self):
         """list of str: Labels of the basis-states of the measured qubits"""
-        return self.basis.labels
+        return [r"$|$" + str(x) + r"$\rangle$" for x in self.basis.state_labels]
 
     def __bool__(self):
         return not self.isnan
+
+    def save(self, file):
+        """ Save the measurement data to a file
+
+        Parameters
+        ----------
+        file: file-like or str
+            File or filename to which the data is saved. If file is a string or Path,
+            a .npy extension will be appended to the file name if it does not already have one.
+        """
+        np.save(file, self.data)
 
     def binary(self):
         """ np.ndarray: Converts measurement data to binary representation"""
@@ -60,6 +88,10 @@ class Result:
     def binary_mean(self):
         """ np.ndarray: Computes the mean of the binary data """
         return (-np.sign(self.mean()) + 1) / 2
+
+    def density_matrix(self):
+        _, hist = self.histogram()
+        return density_matrix(hist)
 
     def histogram(self, normalize=True):
         """ Computes the binary histogram of the measurement data
@@ -76,15 +108,18 @@ class Result:
         """
         return binary_histogram(self.binary(), normalize)
 
-    def show_histogram(self, show=True, padding=0.2, color=None, alpha=0.9, max_line=True, lc="r", lw=1):
+    def show_histogram(self, show=True, padding=0.2, color=None, alpha=0.9, scale=False,
+                       max_line=True, lc="r", lw=1):
         bins, hist = self.histogram()
-        plot = plot_binary_histogram(bins, hist, self.labels, padding, color, alpha, max_line, lc, lw)
+        labels = [r"$|$" + str(x) + r"$\rangle$" for x in self.basis.state_labels]
+        plot = plot_binary_histogram(bins, hist, labels, padding, color, alpha, scale, max_line, lc, lw)
+        plot.set_labels("State", "p")
         if show:
             plot.show()
         return plot
 
     def __str__(self):
-        string = f"Measurement Result (n={self.n}):\n"
+        string = f"Measurement Result (samples={self.n_samples}):\n"
         string += f"  Mean:   {self.mean()}\n"
         string += f"  Binary: {self.binary_mean()}"
         return string
@@ -494,7 +529,85 @@ class Circuit:
         qubits = self.qureg.list(qubits)
         return self.state.measure(qubits, basis)
 
-    def run_shot(self, state=None):
+    def measure_x(self, qubits, shadow=False, snapshot=True):
+        """ Performs a measurement of a single qubit in the x-basis.
+
+        See Also
+        --------
+        qsim.core.backends.Statevector.measure_x
+
+        Parameters
+        ----------
+        qubits: array_like of Qubit or Qubit
+            The qubits that are measured.
+        shadow: bool, optional
+            Flag if state should remain in the pre-measurement state.
+            The default is 'False'.
+        snapshot: bool, optional
+            Flag if snapshot of statevector should be saved before measurment.
+            The default is 'True'.
+
+        Returns
+        -------
+        result: np.ndarray
+            Eigenvalue corresponding to the measured eigenstate.
+        """
+        qubits = self.qureg.list(qubits)
+        return self.state.measure_x(qubits, shadow, snapshot)
+
+    def measure_y(self, qubits, shadow=False, snapshot=True):
+        """ Performs a measurement of a single qubit in the y-basis.
+
+        See Also
+        --------
+        qsim.core.backends.Statevector.measure_y
+
+        Parameters
+        ----------
+        qubits: array_like of Qubit or Qubit
+            The qubits that are measured.
+        shadow: bool, optional
+            Flag if state should remain in the pre-measurement state.
+            The default is 'False'.
+        snapshot: bool, optional
+            Flag if snapshot of statevector should be saved before measurment.
+            The default is 'True'.
+
+        Returns
+        -------
+        result: np.ndarray
+            Eigenvalue corresponding to the measured eigenstate.
+        """
+        qubits = self.qureg.list(qubits)
+        return self.state.measure_y(qubits, shadow, snapshot)
+
+    def measure_z(self, qubits, shadow=False, snapshot=True):
+        """ Performs a measurement of a single qubit in the z-basis.
+
+        See Also
+        --------
+        qsim.core.backends.Statevector.measure_z
+
+        Parameters
+        ----------
+        qubits: array_like of Qubit or Qubit
+            The qubits that are measured.
+        shadow: bool, optional
+            Flag if state should remain in the pre-measurement state.
+            The default is 'False'.
+        snapshot: bool, optional
+            Flag if snapshot of statevector should be saved before measurment.
+            The default is 'True'.
+
+        Returns
+        -------
+        result: np.ndarray
+            Eigenvalue corresponding to the measured eigenstate.
+        """
+        qubits = self.qureg.list(qubits)
+        return self.state.measure_z(qubits, shadow, snapshot)
+
+    def run_circuit(self, state=None):
         """ Run the configured circuit once.
 
         After initializing the state of the circuit each of the instructions is applied to the state.
@@ -552,7 +665,7 @@ class Circuit:
             terminal.write(header)
         data = np.zeros((shots, self.n_clbits), dtype="float")
         for i in range(shots):
-            data[i] = self.run_shot(state)
+            data[i] = self.run_circuit(state)
             if verbose:
                 terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
         if verbose:

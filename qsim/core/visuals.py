@@ -8,7 +8,6 @@ version: 1.0
 """
 import numpy as np
 from itertools import product
-from scitools import Plot, Circle
 
 
 class Visualizer:
