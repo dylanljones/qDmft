@@ -8,7 +8,8 @@ version: 0.1
 """
 import os
 import numpy as np
-from scitools import prange, Plot
+import matplotlib.pyplot as plt
+from scitools import Plot
 from qsim import pauli, ZERO, kron, Circuit, VqeSolver
 from qsim.dmft import gf_greater, gf_lesser
 from qsim.dmft import fit_gf_measurement, print_popt, get_gf_fit_data, get_gf_spectral_data
@@ -121,12 +122,15 @@ def measure_data(siam, gs, nt, tmax, imag=True, shots=None):
     times = np.arange(n) * dt
     data = np.zeros((n, 4), "complex")
     header = "Measuring " + ("real" if imag is False else "imaginary")
-    for step in prange(n, header=header):
+    print(header, end="", flush=True)
+    for step in range(n):
+        print(f"\r{header}: {100 * (step + 1) / n:.1f}% ({step + 1}/{n})", end="", flush=True)
         xx = _measure(gs, xy_arg, b_arg, step, "x", "x", imag, shots)
         xy = _measure(gs, xy_arg, b_arg, step, "x", "y", imag, shots)
         yx = _measure(gs, xy_arg, b_arg, step, "y", "x", imag, shots)
         yy = _measure(gs, xy_arg, b_arg, step, "y", "y", imag, shots)
         data[step] = [xx, xy, yx, yy]
+    print()
     return times, data
 
 
@@ -169,8 +173,6 @@ def measure_gf_imag(siam, nt, tmax, shots=None, new_state=True, new_data=True):
 def plot_result(times, data, t_fit, fit, z, gf, gf_ref=None, title=None):
     plot = Plot.subplots(2, 1, hr=(1, 1))
     # plot.set_figsize(width=800)
-    if title:
-        plot.set_title(title)
     plot.add_gridsubplot(0)
     plot.set_limits((0, np.max(times)), (-1.05, 1.05))
     plot.set_labels(r"$\tau t^*$", r"$iG_{imp}^{R}(\tau)$")
@@ -192,11 +194,11 @@ def plot_result(times, data, t_fit, fit, z, gf, gf_ref=None, title=None):
 
 
 def main():
-    u, t = 4, 1
+    u, t = 0, 1
     tmax, nt = 6, 48
     siam = TwoSiteSiam(u=u, eps_imp=0, eps_bath=0, v=t, mu=u/2)
     p0 = [0.5, 0.5, siam.v, siam.u]
-    shots = 1000
+    shots = 500
 
     times, gf_im = measure_gf_imag(siam, nt, tmax, shots, new_data=True, new_state=True)
     popt, errs = fit_gf_measurement(times, gf_im.real, p0=p0)
@@ -207,7 +209,7 @@ def main():
     gf_ref = impurity_gf_ref(z, siam.u, siam.v)
     title = f"samples={shots}, N$_t$={nt}"
     plot = plot_result(times, gf_im, t_fit, fit, z, gf, gf_ref, title)
-    plot.show()
+    plt.show()
 
 
 if __name__ == "__main__":

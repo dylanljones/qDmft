@@ -9,7 +9,6 @@ version: 0.1
 import os
 import numpy as np
 from qsim import *
-from scitools import Plot
 
 
 def ham_kin_even(n):

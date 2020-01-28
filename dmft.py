@@ -8,6 +8,7 @@ version: 0.1
 """
 import numpy as np
 import numpy.linalg as la
+import matplotlib.pyplot as plt
 from scitools import Plot
 from dmft.twosite import *
 
@@ -53,14 +54,16 @@ def main():
     gf0 = siam.impurity_gf_free(z)
     sigma = self_energy(gf0, gf)
 
-    plot = Plot(xlabel=r"$\omega$")
-    plot.grid()
-    plot.plot(z.real, -sigma.imag, color="k", label=r"-Im $\Sigma_{imp}(z)$")
-    plot.plot(z.real, -gf0.imag, label=r"-Im $G_{imp}^{0}(z)$")
-    plot.plot(z.real, -gf.imag, label=r"-Im $G_{imp}(z)$")
-    plot.set_limits(0)
-    plot.legend()
-    plot.show()
+    fig, ax = plt.subplots()
+    ax.set_xlabel(r"$\omega$")
+    ax.plot(z.real, -sigma.imag, color="k", label=r"-Im $\Sigma_{imp}(z)$")
+    ax.plot(z.real, -gf0.imag, label=r"-Im $G_{imp}^{0}(z)$")
+    ax.plot(z.real, -gf.imag, label=r"-Im $G_{imp}(z)$")
+    ax.set_axisbelow(True)
+    ax.grid()
+    ax.set_xlim(np.min(z.real), np.max(z.real))
+    ax.legend()
+    plt.show()
 
 
 if __name__ == "__main__":
