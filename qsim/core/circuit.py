@@ -7,7 +7,7 @@ project: qsim
 version: 1.0
 """
 import numpy as np
-from scitools import Terminal
+import matplotlib.pyplot as plt
 from .register import Qubit, Clbit, QuRegister, ClRegister
 from .utils import Basis, get_info, binary_histogram, plot_binary_histogram, density_matrix
 from .backends import StateVector
@@ -112,11 +112,13 @@ class Result:
                        max_line=True, lc="r", lw=1):
         bins, hist = self.histogram()
         labels = [r"$|$" + str(x) + r"$\rangle$" for x in self.basis.state_labels]
-        plot = plot_binary_histogram(bins, hist, labels, padding, color, alpha, scale, max_line, lc, lw)
-        plot.set_labels("State", "p")
+        fig, ax = plot_binary_histogram(bins, hist, labels, padding, color, alpha, scale, max_line, lc, lw)
+        ax.set_xlabel("State")
+        ax.set_ylabel("p")
+        fig.tight_layout()
         if show:
-            plot.show()
-        return plot
+            plt.show()
+        return fig, ax
 
     def __str__(self):
         string = f"Measurement Result (samples={self.n_samples}):\n"
@@ -659,15 +661,14 @@ class Circuit:
         -------
         res: Result
         """
-        terminal = Terminal()
         header = "Running experiment"
         if verbose:
-            terminal.write(header)
+            print(header, end="", flush=True)
         data = np.zeros((shots, self.n_clbits), dtype="float")
         for i in range(shots):
             data[i] = self.run_circuit(state)
             if verbose:
-                terminal.updateln(header + f": {100*(i + 1)/shots:.1f}% ({i+1}/{shots})")
+                print(f"\r{header}: {100*(i + 1)/shots:.1f}% ({i+1}/{shots})", end="", flush=True)
         if verbose:
-            terminal.writeln()
+            print()
         return Result(data)

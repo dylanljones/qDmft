@@ -8,7 +8,7 @@ version: 1.0
 """
 import re
 import numpy as np
-from scitools import Plot
+import matplotlib.pyplot as plt
 
 si = np.eye(2)
 sx = np.array([[0, 1], [1, 0]])
@@ -302,17 +302,18 @@ def binary_histogram(data, normalize=True):
 
 def plot_binary_histogram(bins, hist, labels=None, padding=0.2, color=None, alpha=0.9, scale=False,
                           max_line=True, lc="r", lw=1):
-    plot = Plot()
-    plot.set_limits(xlim=(-0.5, len(bins) - 0.5))
-    plot.set_ticks(xticks=bins)
+    fig, ax = plt.subplots()
+    ax.set_xlim(-0.5, len(bins) - 0.5)
+    ax.set_xticks(bins)
     if not scale:
-        plot.set_limits(ylim=(0, 1.1))
-        plot.set_ticks(yticks=np.arange(0, 1.1, 0.2))
-    plot.grid(axis="y")
+        ax.set_ylim(0, 1.1)
+        ax.set_yticks(np.arange(0, 1.1, 0.2))
+    ax.set_axisbelow(True)
+    ax.grid(axis="y")
     if labels is not None:
-        plot.set_ticklabels(labels)
-    plot.bar(bins, hist, width=1-padding, color=color, alpha=alpha)
+        ax.set_xticklabels(labels)
+    ax.bar(bins, hist, width=1-padding, color=color, alpha=alpha)
     if max_line:
         ymax = np.max(hist)
-        plot.draw_lines(y=ymax, color=lc, lw=lw)
-    return plot
+        ax.axhline(ymax, color=lc, lw=lw)
+    return fig, ax
