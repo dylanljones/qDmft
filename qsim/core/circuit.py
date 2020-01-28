@@ -185,20 +185,20 @@ class Circuit:
         for inst in self.instructions:
             yield inst
 
+    def _build_string(self, show_args=True, padding=1, maxwidth=None):
+        s = CircuitString(len(self.qubits), padding)
+        for instructions in self.instructions:
+            s.add(instructions, show_arg=show_args)
+        return s.build(wmax=maxwidth)
+
     def __repr__(self):
         return f"Circuit(qubits: {self.qubits}, clbits: {self.clbits})"
 
     def __str__(self):
-        string = self.__repr__()
-        for inst in self.instructions:
-            string += "\n   " + str(inst)
-        return string
+        return self._build_string(show_args=False)
 
     def print(self, show_args=True, padding=1, maxwidth=None):
-        s = CircuitString(len(self.qubits), padding)
-        for instructions in self.instructions:
-            s.add(instructions, show_arg=show_args)
-        print(s.build(wmax=maxwidth))
+        print(self._build_string(show_args, padding, maxwidth))
 
     def show(self):
         pass
